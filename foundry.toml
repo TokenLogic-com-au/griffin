@@ -1,0 +1,15 @@
+[profile.default]
+src = "src"
+out = "out"
+test = 'test'
+libs = ["lib"]
+solc = '0.8.28'
+remappings = []
+
+[rpc_endpoints]
+mainnet = "${RPC_MAINNET}"
+
+[etherscan]
+mainnet = { key = "${ETHERSCAN_API_KEY}", chain = 1 }
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
