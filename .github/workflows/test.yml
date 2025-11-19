@@ -26,7 +26,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          forge install --no-commit
+          forge install
 
       - name: Run Forge fmt
         run: |
