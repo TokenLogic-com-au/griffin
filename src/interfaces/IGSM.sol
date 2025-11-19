@@ -28,10 +28,7 @@ interface IGSM {
      * @return grossAmount Gross amount before fees
      * @return fee Fee amount
      */
-    function getGhoAmountForBuyAsset(uint256 minAssetAmount) 
-        external 
-        view 
-        returns (uint256, uint256, uint256, uint256);
+    function getGhoAmountForBuyAsset(uint256 minAssetAmount) external view returns (uint256, uint256, uint256, uint256);
 
     /**
      * @notice Get GHO amount for selling a specific amount of asset
@@ -41,10 +38,7 @@ interface IGSM {
      * @return grossAmount Gross amount before fees
      * @return fee Fee amount
      */
-    function getGhoAmountForSellAsset(uint256 maxAssetAmount) 
-        external 
-        view 
-        returns (uint256, uint256, uint256, uint256);
+    function getGhoAmountForSellAsset(uint256 maxAssetAmount) external view returns (uint256, uint256, uint256, uint256);
 
     /**
      * @notice Get asset amount for buying with specific GHO amount
@@ -54,10 +48,7 @@ interface IGSM {
      * @return grossAmount Gross amount before fees
      * @return fee Fee amount
      */
-    function getAssetAmountForBuyAsset(uint256 maxGhoAmount) 
-        external 
-        view 
-        returns (uint256, uint256, uint256, uint256);
+    function getAssetAmountForBuyAsset(uint256 maxGhoAmount) external view returns (uint256, uint256, uint256, uint256);
 
     /**
      * @notice Get asset amount for selling to receive specific GHO amount
@@ -67,10 +58,7 @@ interface IGSM {
      * @return grossAmount Gross amount before fees
      * @return fee Fee amount
      */
-    function getAssetAmountForSellAsset(uint256 minGhoAmount) 
-        external 
-        view 
-        returns (uint256, uint256, uint256, uint256);
+    function getAssetAmountForSellAsset(uint256 minGhoAmount) external view returns (uint256, uint256, uint256, uint256);
 
     /**
      * @notice Get available liquidity for swaps

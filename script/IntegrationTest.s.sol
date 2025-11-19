@@ -89,7 +89,6 @@ contract IntegrationTest is Script {
         console.log("[PASS] USDT whale has enough for test swap");
 
         console.log("[PASS] Router ready for swaps\n");
-
     }
 
     /**
@@ -106,7 +105,6 @@ contract IntegrationTest is Script {
         uint256 initialUsdc = IERC20(USDC).balanceOf(user);
         console.log("Initial USDC balance:", initialUsdc / 1e6);
         require(initialUsdc >= usdcAmount, "Whale should have enough USDC");
-
 
         console.log("Swapping 1k USDC");
         IERC20(USDC).approve(address(router), usdcAmount);

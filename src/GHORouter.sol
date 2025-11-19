@@ -20,19 +20,9 @@ contract GHORouter {
     error InvalidAmount();
     error SlippageExceeded();
 
-    event SwapToGHO(
-        address indexed user,
-        address indexed inputToken,
-        uint256 inputAmount,
-        uint256 ghoAmount
-    );
+    event SwapToGHO(address indexed user, address indexed inputToken, uint256 inputAmount, uint256 ghoAmount);
 
-    event SwapFromGHO(
-        address indexed user,
-        address indexed outputToken,
-        uint256 ghoAmount,
-        uint256 outputAmount
-    );
+    event SwapFromGHO(address indexed user, address indexed outputToken, uint256 ghoAmount, uint256 outputAmount);
 
     /**
      * @notice Swap USDC or USDT to GHO
@@ -41,11 +31,7 @@ contract GHORouter {
      * @param minGHOAmount Minimum GHO to receive (slippage protection)
      * @return ghoAmount Amount of GHO received
      */
-    function swapToGHO(
-        address token,
-        uint256 amount,
-        uint256 minGHOAmount
-    ) external returns (uint256 ghoAmount) {
+    function swapToGHO(address token, uint256 amount, uint256 minGHOAmount) external returns (uint256 ghoAmount) {
         if (amount == 0) revert InvalidAmount();
         if (token != Addresses.USDC && token != Addresses.USDT) revert InvalidToken();
 
@@ -80,11 +66,10 @@ contract GHORouter {
      * @param minOutputAmount Minimum output token to receive
      * @return outputAmount Amount of output token received
      */
-    function swapFromGHO(
-        address token,
-        uint256 ghoAmount,
-        uint256 minOutputAmount
-    ) external returns (uint256 outputAmount) {
+    function swapFromGHO(address token, uint256 ghoAmount, uint256 minOutputAmount)
+        external
+        returns (uint256 outputAmount)
+    {
         if (ghoAmount == 0) revert InvalidAmount();
         if (token != Addresses.USDC && token != Addresses.USDT) revert InvalidToken();
 
@@ -96,15 +81,11 @@ contract GHORouter {
 
         // Step 1: Swap GHO for stataToken via GSM
         IERC20(Addresses.GHO).forceApprove(gsmAddress, ghoAmount);
-        (uint256 stataAmount, ) = IGSM(gsmAddress).buyAsset(0, address(this));
+        (uint256 stataAmount,) = IGSM(gsmAddress).buyAsset(0, address(this));
 
         // Step 2: Redeem stataToken for underlying asset (ERC-4626 vault)
         // The stataToken handles Aave withdrawal internally
-        outputAmount = IStaticAToken(stataToken).redeem(
-            stataAmount,
-            address(this),
-            address(this)
-        );
+        outputAmount = IStaticAToken(stataToken).redeem(stataAmount, address(this), address(this));
 
         // Slippage check
         if (outputAmount < minOutputAmount) revert SlippageExceeded();
@@ -115,8 +96,6 @@ contract GHORouter {
         emit SwapFromGHO(msg.sender, token, ghoAmount, outputAmount);
     }
 
-
-
     /**
      * @notice Preview how much GHO will be received for a given amount
      * @param token Input token
@@ -124,18 +103,14 @@ contract GHORouter {
      * @return ghoAmount Expected GHO amount (after fees)
      * @return fee Fee amount
      */
-    function previewSwapToGHO(address token, uint256 amount) 
-        external 
-        view 
-        returns (uint256 ghoAmount, uint256 fee) 
-    {
+    function previewSwapToGHO(address token, uint256 amount) external view returns (uint256 ghoAmount, uint256 fee) {
         if (token != Addresses.USDC && token != Addresses.USDT) revert InvalidToken();
 
         address gsmAddress = token == Addresses.USDC ? Addresses.GSM_USDC : Addresses.GSM_USDT;
 
         // Get preview from GSM - this is a simplified preview
         // Actual amount may vary slightly due to interest accrual in Aave
-        (, ghoAmount, , fee) = IGSM(gsmAddress).getGhoAmountForSellAsset(amount);
+        (, ghoAmount,, fee) = IGSM(gsmAddress).getGhoAmountForSellAsset(amount);
     }
 
     /**
@@ -145,16 +120,16 @@ contract GHORouter {
      * @return assetAmount Expected output token amount (stataToken, after fees)
      * @return fee Fee amount
      */
-    function previewSwapFromGHO(address token, uint256 ghoAmount) 
-        external 
-        view 
-        returns (uint256 assetAmount, uint256 fee) 
+    function previewSwapFromGHO(address token, uint256 ghoAmount)
+        external
+        view
+        returns (uint256 assetAmount, uint256 fee)
     {
         if (token != Addresses.USDC && token != Addresses.USDT) revert InvalidToken();
 
         address gsmAddress = token == Addresses.USDC ? Addresses.GSM_USDC : Addresses.GSM_USDT;
 
         // Get preview from GSM
-        (, assetAmount, , fee) = IGSM(gsmAddress).getAssetAmountForBuyAsset(ghoAmount);
+        (, assetAmount,, fee) = IGSM(gsmAddress).getAssetAmountForBuyAsset(ghoAmount);
     }
 }
