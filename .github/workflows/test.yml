@@ -24,6 +24,10 @@ jobs:
         run: |
           forge --version
 
+      - name: Install dependencies
+        run: |
+          forge install --no-commit
+
       - name: Run Forge fmt
         run: |
           forge fmt --check
