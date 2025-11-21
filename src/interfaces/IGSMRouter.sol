@@ -6,7 +6,6 @@ pragma solidity 0.8.30;
  * @notice Interface for GSMRouter contract
  */
 interface IGSMRouter {
-
     error InvalidToken();
     error InvalidAmount();
     error SlippageExceeded();
@@ -92,6 +91,8 @@ interface IGSMRouter {
      * @return assetAmount Expected amount of output token to receive
      * @return fee Fee amount charged by the GSM
      */
-    function previewSwapFromGHO(address token, uint256 ghoAmount) external view returns (uint256 assetAmount, uint256 fee);
-
+    function previewSwapFromGHO(address token, uint256 ghoAmount)
+        external
+        view
+        returns (uint256 assetAmount, uint256 fee);
 }
