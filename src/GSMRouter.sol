@@ -6,6 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IStaticAToken} from "./interfaces/IStaticAToken.sol";
 import {IGSM} from "./interfaces/IGSM.sol";
+import {IGSMRouter} from "./interfaces/IGSMRouter.sol";
 
 /**
  * @title GSMRouter
@@ -13,32 +14,35 @@ import {IGSM} from "./interfaces/IGSM.sol";
  * @dev This contract never stores user funds and uses exact approvals only
  * @dev Uses SafeERC20 to handle non-standard tokens like USDT
  */
-contract GSMRouter is Ownable {
+contract GSMRouter is Ownable, IGSMRouter {
     using SafeERC20 for IERC20;
 
     // Token Constants
+    /// @notice Address of USDC token
     address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    /// @notice Address of USDT token
     address public constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+    /// @notice Address of GHO token
     address public constant GHO = 0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f;
 
     // Static aTokens Constants
+    /// @notice Address of Static aToken for USDC
     address public constant STATA_USDC = 0xD4fa2D31b7968E448877f69A96DE69f5de8cD23E;
+    /// @notice Address of Static aToken for USDT
     address public constant STATA_USDT = 0x7Bc3485026Ac48b6cf9BaF0A377477Fff5703Af8;
 
     // GSM State Variables
+    /// @notice Address of GSM for USDC
     address public gsmUSDC;
+    /// @notice Address of GSM for USDT
     address public gsmUSDT;
 
-    error InvalidToken();
-    error InvalidAmount();
-    error SlippageExceeded();
-    error ZeroAddress();
-
-    event SwapToGHO(address indexed user, address indexed inputToken, uint256 inputAmount, uint256 ghoAmount);
-    event SwapFromGHO(address indexed user, address indexed outputToken, uint256 ghoAmount, uint256 outputAmount);
-    event GsmUSDCUpdated(address indexed newGsm);
-    event GsmUSDTUpdated(address indexed newGsm);
-
+    /**
+     * @notice Constructor to initialize the contract
+     * @param _owner Address of the contract owner
+     * @param _gsmUSDC Address of the GSM for USDC
+     * @param _gsmUSDT Address of the GSM for USDT
+     */
     constructor(address _owner, address _gsmUSDC, address _gsmUSDT) Ownable(_owner) {
         if (_gsmUSDC == address(0) || _gsmUSDT == address(0)) revert ZeroAddress();
         gsmUSDC = _gsmUSDC;

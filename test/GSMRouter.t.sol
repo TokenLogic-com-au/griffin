@@ -3,6 +3,7 @@ pragma solidity 0.8.30;
 
 import {Test} from "forge-std/Test.sol";
 import {GSMRouter} from "../src/GSMRouter.sol";
+import {IGSMRouter} from "../src/interfaces/IGSMRouter.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
@@ -72,7 +73,7 @@ contract GSMRouterTest is Test {
     function testSwapToGHORevertOnZeroAmount() public {
         // Should revert with InvalidAmount error
         address usdc = router.USDC();
-        vm.expectRevert(GSMRouter.InvalidAmount.selector);
+        vm.expectRevert(IGSMRouter.InvalidAmount.selector);
         router.swapToGHO(usdc, 0, 0);
     }
 
@@ -80,14 +81,14 @@ contract GSMRouterTest is Test {
         address unsupportedToken = address(0x1234567890123456789012345678901234567890);
 
         // Should revert with InvalidToken error
-        vm.expectRevert(GSMRouter.InvalidToken.selector);
+        vm.expectRevert(IGSMRouter.InvalidToken.selector);
         router.swapToGHO(unsupportedToken, 1000 * 1e6, 0);
     }
 
     function testSwapFromGHORevertOnZeroAmount() public {
         // Should revert with InvalidAmount error
         address usdc = router.USDC();
-        vm.expectRevert(GSMRouter.InvalidAmount.selector);
+        vm.expectRevert(IGSMRouter.InvalidAmount.selector);
         router.swapFromGHO(usdc, 0, 0);
     }
 
@@ -95,7 +96,7 @@ contract GSMRouterTest is Test {
         address unsupportedToken = address(0x1234567890123456789012345678901234567890);
 
         // Should revert with InvalidToken error
-        vm.expectRevert(GSMRouter.InvalidToken.selector);
+        vm.expectRevert(IGSMRouter.InvalidToken.selector);
         router.swapFromGHO(unsupportedToken, 1000 * 1e18, 0);
     }
 
@@ -104,7 +105,7 @@ contract GSMRouterTest is Test {
         uint256 amount = 1000 * 1e6;
 
         // Should revert with InvalidToken error
-        vm.expectRevert(GSMRouter.InvalidToken.selector);
+        vm.expectRevert(IGSMRouter.InvalidToken.selector);
         router.previewSwapToGHO(unsupportedToken, amount);
     }
 

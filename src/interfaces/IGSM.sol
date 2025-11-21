@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+/**
+ * @title IGSM
+ * @notice Interface for GHO Stability Module (GSM)
+ */
 interface IGSM {
     /**
      * @notice Buy asset with GHO
