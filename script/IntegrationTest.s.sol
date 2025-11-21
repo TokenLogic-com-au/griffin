@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.22;
+pragma solidity 0.8.30;
 
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
-import {GHORouter} from "../src/GHORouter.sol";
+import {GSMRouter} from "../src/GSMRouter.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Addresses} from "../src/Addresses.sol";
 
 /**
  * @title IntegrationTest
- * @notice Integration tests for GHORouter on mainnet fork
+ * @notice Integration tests for GSMRouter on mainnet fork
  * @dev Run with: forge script script/IntegrationTest.s.sol --fork-url $ETH_RPC_URL -vvv
  */
 contract IntegrationTest is Script {
     using SafeERC20 for IERC20;
 
-    GHORouter public router;
+    GSMRouter public router;
 
     // Mainnet whale addresses for testing
     address constant USDC_WHALE = 0x37305B1cD40574E4C5Ce33f8e8306Be057fD7341; // Wintermute
@@ -27,7 +27,7 @@ contract IntegrationTest is Script {
     address constant GHO = Addresses.GHO;
 
     function setUp() public {
-        router = new GHORouter();
+        router = new GSMRouter(address(this), Addresses.GSM_USDC, Addresses.GSM_USDT);
 
         console.log("\n=== Integration Test Setup ===");
         console.log("Router deployed at:", address(router));

@@ -99,11 +99,11 @@ forge test --gas-report
 ### Integration Example
 
 ```solidity
-import {GHORouter} from "./src/GHORouter.sol";
+import {GSMRouter} from "./src/GSMRouter.sol";
 import {IERC20} from "./src/interfaces/IERC20.sol";
 
 // Deploy router
-GHORouter router = new GHORouter();
+GSMRouter router = new GSMRouter();
 
 // Swap USDC to GHO
 IERC20(USDC).approve(address(router), 1000e6);
@@ -126,7 +126,7 @@ uint256 usdcReceived = router.swapFromGHO(
 
 ```typescript
 // TypeScript/ethers.js example
-const router = new ethers.Contract(routerAddress, GHORouterABI, signer);
+const router = new ethers.Contract(routerAddress, GSMRouterABI, signer);
 
 // Approve USDC
 const usdc = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, signer);
@@ -167,7 +167,7 @@ await tx.wait();
 ```
 griffin/
 ├── src/
-│   ├── GHORouter.sol           # Main router contract
+│   ├── GSMRouter.sol           # Main router contract
 │   ├── Addresses.sol           # Mainnet address constants
 │   └── interfaces/
 │       ├── IERC20.sol
@@ -176,7 +176,7 @@ griffin/
 │       ├── IPool.sol
 │       └── IStaticAToken.sol
 ├── test/
-│   ├── GHORouter.t.sol         # Integration tests
+│   ├── GSMRouter.t.sol         # Integration tests
 ├── foundry.toml                # Foundry configuration
 ├── README.md                   # This file
 ```
