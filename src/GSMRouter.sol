@@ -20,7 +20,7 @@ contract GSMRouter is Ownable {
     address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     address public constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
     address public constant GHO = 0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f;
-    
+
     // Static aTokens Constants
     address public constant STATA_USDC = 0xD4fa2D31b7968E448877f69A96DE69f5de8cD23E;
     address public constant STATA_USDT = 0x7Bc3485026Ac48b6cf9BaF0A377477Fff5703Af8;
@@ -72,7 +72,7 @@ contract GSMRouter is Ownable {
      * @param minGHOAmount Minimum GHO to receive (slippage protection)
      * @return ghoAmount Amount of GHO received
      */
-    function swapToGHO(address token, uint256 amount, uint256 minGHOAmount) external returns (uint256 ghoAmount) {
+    function swapToGHO(address token, uint256 amount, uint256 minGHOAmount) external returns (uint256) {
         if (amount == 0) revert InvalidAmount();
         if (token != USDC && token != USDT) revert InvalidToken();
 
@@ -89,7 +89,7 @@ contract GSMRouter is Ownable {
 
         // Step 2: Swap stataToken for GHO via GSM
         IERC20(stataToken).forceApprove(gsmAddress, stataAmount);
-        (, ghoAmount) = IGSM(gsmAddress).sellAsset(stataAmount, address(this));
+        (, uint256 ghoAmount) = IGSM(gsmAddress).sellAsset(stataAmount, address(this));
 
         // Slippage check
         if (ghoAmount < minGHOAmount) revert SlippageExceeded();
@@ -98,6 +98,8 @@ contract GSMRouter is Ownable {
         IERC20(GHO).safeTransfer(msg.sender, ghoAmount);
 
         emit SwapToGHO(msg.sender, token, amount, ghoAmount);
+
+        return ghoAmount;
     }
 
     /**
@@ -109,7 +111,7 @@ contract GSMRouter is Ownable {
      */
     function swapFromGHO(address token, uint256 ghoAmount, uint256 minOutputAmount)
         external
-        returns (uint256 outputAmount)
+        returns (uint256)
     {
         if (ghoAmount == 0) revert InvalidAmount();
         if (token != USDC && token != USDT) revert InvalidToken();
@@ -126,7 +128,7 @@ contract GSMRouter is Ownable {
 
         // Step 2: Redeem stataToken for underlying asset (ERC-4626 vault)
         // The stataToken handles Aave withdrawal internally
-        outputAmount = IStaticAToken(stataToken).redeem(stataAmount, address(this), address(this));
+        uint256 outputAmount = IStaticAToken(stataToken).redeem(stataAmount, address(this), address(this));
 
         // Slippage check
         if (outputAmount < minOutputAmount) revert SlippageExceeded();
@@ -135,6 +137,8 @@ contract GSMRouter is Ownable {
         IERC20(token).safeTransfer(msg.sender, outputAmount);
 
         emit SwapFromGHO(msg.sender, token, ghoAmount, outputAmount);
+
+        return outputAmount;
     }
 
     /**
@@ -144,14 +148,15 @@ contract GSMRouter is Ownable {
      * @return ghoAmount Expected GHO amount (after fees)
      * @return fee Fee amount
      */
-    function previewSwapToGHO(address token, uint256 amount) external view returns (uint256 ghoAmount, uint256 fee) {
+    function previewSwapToGHO(address token, uint256 amount) external view returns (uint256, uint256) {
         if (token != USDC && token != USDT) revert InvalidToken();
 
         address gsmAddress = token == USDC ? gsmUSDC : gsmUSDT;
 
         // Get preview from GSM - this is a simplified preview
         // Actual amount may vary slightly due to interest accrual in Aave
-        (, ghoAmount,, fee) = IGSM(gsmAddress).getGhoAmountForSellAsset(amount);
+        (, uint256 ghoAmount, , uint256 fee) = IGSM(gsmAddress).getGhoAmountForSellAsset(amount);
+        return (ghoAmount, fee);
     }
 
     /**
@@ -164,13 +169,14 @@ contract GSMRouter is Ownable {
     function previewSwapFromGHO(address token, uint256 ghoAmount)
         external
         view
-        returns (uint256 assetAmount, uint256 fee)
+        returns (uint256, uint256)
     {
         if (token != USDC && token != USDT) revert InvalidToken();
 
         address gsmAddress = token == USDC ? gsmUSDC : gsmUSDT;
 
         // Get preview from GSM
-        (, assetAmount,, fee) = IGSM(gsmAddress).getAssetAmountForBuyAsset(ghoAmount);
+        (, uint256 assetAmount, , uint256 fee) = IGSM(gsmAddress).getAssetAmountForBuyAsset(ghoAmount);
+        return (assetAmount, fee);
     }
 }

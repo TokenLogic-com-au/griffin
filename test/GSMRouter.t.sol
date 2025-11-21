@@ -32,7 +32,7 @@ contract GSMRouterTest is Test {
 
     function testSetGsms() public {
         address newGsm = makeAddr("newGsm");
-        
+
         router.setGsmUSDC(newGsm);
         assertEq(router.gsmUSDC(), newGsm);
 
@@ -43,7 +43,7 @@ contract GSMRouterTest is Test {
     function testSetGsmsOnlyOwner() public {
         address newGsm = makeAddr("newGsm");
         address notOwner = makeAddr("notOwner");
-        
+
         vm.prank(notOwner);
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, notOwner));
         router.setGsmUSDC(newGsm);
