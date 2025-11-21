@@ -7,7 +7,6 @@ import {GSMRouter} from "../src/GSMRouter.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-
 /**
  * @title IntegrationTest
  * @notice Integration tests for GSMRouter on mainnet fork
@@ -27,7 +26,7 @@ contract IntegrationTest is Script {
     address constant GSM_USDT = 0x535b2f7C20B9C83d70e519cf9991578eF9816B7B;
 
     function setUp() public {
-        router = new GSMRouter(address(this), GSM_USDC, GSM_USDT);
+        router = new GSMRouter(msg.sender, GSM_USDC, GSM_USDT);
 
         console.log("\n=== Integration Test Setup ===");
         console.log("Router deployed at:", address(router));

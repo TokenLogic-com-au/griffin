@@ -109,10 +109,7 @@ contract GSMRouter is Ownable {
      * @param minOutputAmount Minimum output token to receive
      * @return outputAmount Amount of output token received
      */
-    function swapFromGHO(address token, uint256 ghoAmount, uint256 minOutputAmount)
-        external
-        returns (uint256)
-    {
+    function swapFromGHO(address token, uint256 ghoAmount, uint256 minOutputAmount) external returns (uint256) {
         if (ghoAmount == 0) revert InvalidAmount();
         if (token != USDC && token != USDT) revert InvalidToken();
 
@@ -155,7 +152,7 @@ contract GSMRouter is Ownable {
 
         // Get preview from GSM - this is a simplified preview
         // Actual amount may vary slightly due to interest accrual in Aave
-        (, uint256 ghoAmount, , uint256 fee) = IGSM(gsmAddress).getGhoAmountForSellAsset(amount);
+        (, uint256 ghoAmount,, uint256 fee) = IGSM(gsmAddress).getGhoAmountForSellAsset(amount);
         return (ghoAmount, fee);
     }
 
@@ -166,17 +163,13 @@ contract GSMRouter is Ownable {
      * @return assetAmount Expected output token amount (stataToken, after fees)
      * @return fee Fee amount
      */
-    function previewSwapFromGHO(address token, uint256 ghoAmount)
-        external
-        view
-        returns (uint256, uint256)
-    {
+    function previewSwapFromGHO(address token, uint256 ghoAmount) external view returns (uint256, uint256) {
         if (token != USDC && token != USDT) revert InvalidToken();
 
         address gsmAddress = token == USDC ? gsmUSDC : gsmUSDT;
 
         // Get preview from GSM
-        (, uint256 assetAmount, , uint256 fee) = IGSM(gsmAddress).getAssetAmountForBuyAsset(ghoAmount);
+        (, uint256 assetAmount,, uint256 fee) = IGSM(gsmAddress).getAssetAmountForBuyAsset(ghoAmount);
         return (assetAmount, fee);
     }
 }
