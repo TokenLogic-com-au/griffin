@@ -1,95 +1,51 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {Script} from "forge-std/Script.sol";
-import {console} from "forge-std/console.sol";
-import {GSMRouter} from "../src/GSMRouter.sol";
-import {IGSM} from "../src/interfaces/IGSM.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
+import {GSMRouter} from "src/contracts/onboarding/GSMRouter.sol";
+import {IGSM} from "src/interfaces/IGSM.sol";
+
 /**
- * @title IntegrationTest
+ * @title GSMRouterTest
  * @notice Integration tests for GSMRouter on mainnet fork
- * @dev Run with: forge script script/IntegrationTest.s.sol --fork-url $ETH_RPC_URL -vvv
+ * @dev Run with: forge test --match-path test/fork/onboarding/GSMRouterTest.t.sol -vvv
  */
-contract IntegrationTest is Script {
+contract GSMRouterTest is Script {
     using SafeERC20 for IERC20;
 
     GSMRouter public router;
 
-    // Mainnet whale addresses for testing
-    address constant USDC_WHALE = 0x37305B1cD40574E4C5Ce33f8e8306Be057fD7341; // Wintermute
-    address constant USDT_WHALE = 0xF977814e90dA44bFA03b6295A0616a897441aceC; // Binance 8
-    address constant GHO_WHALE = 0x464C71f6c2F760DdA6093dCB91C24c39e5d6e18c; // Aave Safety Module
+    address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address public constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+    address public constant GHO = 0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f;
+
+    // Static aTokens Constants
+    address public constant STATA_USDC =
+        0xD4fa2D31b7968E448877f69A96DE69f5de8cD23E;
+    address public constant STATA_USDT =
+        0x7Bc3485026Ac48b6cf9BaF0A377477Fff5703Af8;
 
     // Addresses needed for test setup
     address constant GSM_USDC = 0xFeeb6FE430B7523fEF2a38327241eE7153779535;
     address constant GSM_USDT = 0x535b2f7C20B9C83d70e519cf9991578eF9816B7B;
 
     function setUp() public {
-        // Automatically fork if running as a test without CLI fork
-        string memory rpcUrl = vm.envOr("ETH_RPC_URL", string(""));
-        if (bytes(rpcUrl).length > 0) {
-            vm.createSelectFork(rpcUrl);
-        }
+        vm.createSelectFork(vm.rpcUrl("mainnet"));
 
         router = new GSMRouter(msg.sender, GSM_USDC, GSM_USDT);
 
-        console.log("\n=== Integration Test Setup ===");
-        console.log("Router deployed at:", address(router));
-        console.log("USDC:", router.USDC());
-        console.log("USDT:", router.USDT());
-        console.log("GHO:", router.GHO());
+        deal(address(this), router.USDC(), 10_000_000e6);
+        deal(address(this), router.USDT(), 10_000_000e6);
     }
 
-    function run() public {
-        setUp();
+    function test_constructor() public {}
+}
 
-        console.log("\n=== Running Integration Tests ===\n");
-
-        testWhaleBalances();
-        testSwapReadiness();
-        testSwapUSDCToGHO();
-        testSwapUSDTToGHO();
-        testSwapGHOToUSDC();
-        testSwapGHOToUSDT();
-
-        console.log("\n=== Integration Tests Complete ===\n");
-    }
-
-    function testWhaleBalances() public view {
-        uint256 usdcBalance = IERC20(router.USDC()).balanceOf(USDC_WHALE);
-        require(usdcBalance > 0, "USDC whale should have balance");
-
-        uint256 usdtBalance = IERC20(router.USDT()).balanceOf(USDT_WHALE);
-        require(usdtBalance > 0, "USDT whale should have balance");
-    }
-
-    function testSwapReadiness() public view {
-        console.log("--- Test: Swap Readiness ---");
-
-        uint256 testAmount = 1000 * 1e6; // 1000 USDC
-
-        uint256 usdcBalance = IERC20(router.USDC()).balanceOf(USDC_WHALE);
-        require(usdcBalance >= testAmount, "USDC whale has insufficient balance");
-        console.log("[PASS] USDC whale has enough for test swap");
-
-        uint256 usdtBalance = IERC20(router.USDT()).balanceOf(USDT_WHALE);
-        require(usdtBalance >= testAmount, "USDT whale has insufficient balance");
-        console.log("[PASS] USDT whale has enough for test swap");
-
-        console.log("[PASS] Router ready for swaps\n");
-    }
-
-    /**
-     * @notice Test USDC to GHO swap
-     */
+contract SwapToGHOTest is GSMRouterTest {
     function testSwapUSDCToGHO() public {
-        console.log("--- Test: USDC to GHO Swap ---");
-
         uint256 usdcAmount = 1000 * 1e6; // 1000 USDC
         address user = USDC_WHALE;
         address usdc = router.USDC();
@@ -97,19 +53,15 @@ contract IntegrationTest is Script {
         vm.startPrank(user);
 
         uint256 initialUsdc = IERC20(usdc).balanceOf(user);
-        console.log("Initial USDC balance:", initialUsdc / 1e6);
         require(initialUsdc >= usdcAmount, "Whale should have enough USDC");
 
-        console.log("Swapping 1k USDC");
         IERC20(usdc).approve(address(router), usdcAmount);
         uint256 ghoReceived = router.swapToGHO(usdc, usdcAmount, 0);
+
+        // this should be assert, not require
         require(ghoReceived > 0, "Should receive GHO");
 
-        // Format GHO amount with decimals (18 decimals)
-        console.log("GHO received: %s.%s GHO", ghoReceived / 1e18, (ghoReceived % 1e18) / 1e14);
-
         vm.stopPrank();
-        console.log("[PASS] USDC swap setup validated\n");
     }
 
     /**
@@ -134,7 +86,11 @@ contract IntegrationTest is Script {
         require(ghoReceived > 0, "Should receive GHO");
 
         // Format GHO amount with decimals (18 decimals)
-        console.log("GHO received: %s.%s GHO", ghoReceived / 1e18, (ghoReceived % 1e18) / 1e14);
+        console.log(
+            "GHO received: %s.%s GHO",
+            ghoReceived / 1e18,
+            (ghoReceived % 1e18) / 1e14
+        );
 
         vm.stopPrank();
         console.log("[PASS] USDT swap setup validated\n");
@@ -162,7 +118,11 @@ contract IntegrationTest is Script {
         uint256 usdcReceived = router.swapFromGHO(usdc, ghoAmount, 0);
         require(usdcReceived > 0, "Should receive USDC");
 
-        console.log("USDC received: %s.%s USDC", usdcReceived / 1e6, (usdcReceived % 1e6));
+        console.log(
+            "USDC received: %s.%s USDC",
+            usdcReceived / 1e6,
+            (usdcReceived % 1e6)
+        );
 
         vm.stopPrank();
         console.log("[PASS] GHO -> USDC swap validated\n");
@@ -190,7 +150,11 @@ contract IntegrationTest is Script {
         uint256 usdtReceived = router.swapFromGHO(usdt, ghoAmount, 0);
         require(usdtReceived > 0, "Should receive USDT");
 
-        console.log("USDT received: %s.%s USDT", usdtReceived / 1e6, (usdtReceived % 1e6));
+        console.log(
+            "USDT received: %s.%s USDT",
+            usdtReceived / 1e6,
+            (usdtReceived % 1e6)
+        );
 
         vm.stopPrank();
         console.log("[PASS] GHO -> USDT swap validated\n");

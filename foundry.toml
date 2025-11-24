@@ -11,7 +11,7 @@ remappings = [
 ]
 
 [rpc_endpoints]
-mainnet = "${ETH_RPC_URL}"
+mainnet = "${RPC_URL_MAINNET}"
 
 [etherscan]
 mainnet = { key = "${ETHERSCAN_API_KEY}", chain = 1 }
