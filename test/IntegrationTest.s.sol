@@ -30,6 +30,12 @@ contract IntegrationTest is Script {
     address constant GSM_USDT = 0x535b2f7C20B9C83d70e519cf9991578eF9816B7B;
 
     function setUp() public {
+        // Automatically fork if running as a test without CLI fork
+        string memory rpcUrl = vm.envOr("ETH_RPC_URL", string(""));
+        if (bytes(rpcUrl).length > 0) {
+            vm.createSelectFork(rpcUrl);
+        }
+
         router = new GSMRouter(msg.sender, GSM_USDC, GSM_USDT);
 
         console.log("\n=== Integration Test Setup ===");
