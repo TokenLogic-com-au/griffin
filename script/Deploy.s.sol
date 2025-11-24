@@ -27,7 +27,9 @@ contract Deploy is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         // Deploy GSMRouter with GSM addresses
-        router = new GSMRouter(deployer, GSM_USDC, GSM_USDT);
+        bytes memory args = abi.encode(deployer, GSM_USDC, GSM_USDT);
+        address deployed = vm.deployCode("GSMRouter.sol", args);
+        router = GSMRouter(deployed);
 
         vm.stopBroadcast();
 
@@ -36,8 +38,5 @@ contract Deploy is Script {
         console.log("Owner set to:", deployer);
         console.log("GSM USDC:", router.gsmUSDC());
         console.log("GSM USDT:", router.gsmUSDT());
-        console.log("\n");
-
-        return router;
     }
 }

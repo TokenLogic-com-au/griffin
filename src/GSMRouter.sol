@@ -77,11 +77,10 @@ contract GSMRouter is Ownable, IGSMRouter {
      * @return ghoAmount Amount of GHO received
      */
     function swapToGHO(address token, uint256 amount, uint256 minGHOAmount) external returns (uint256) {
-        if (amount == 0) revert InvalidAmount();
+        if (amount < 1) revert InvalidAmount();
         if (token != USDC && token != USDT) revert InvalidToken();
 
-        address gsmAddress = token == USDC ? gsmUSDC : gsmUSDT;
-        address stataToken = token == USDC ? STATA_USDC : STATA_USDT;
+        (address gsmAddress, address stataToken) = token == USDC ? (gsmUSDC, STATA_USDC) : (gsmUSDT, STATA_USDT);
 
         // Transfer tokens from user
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
@@ -114,11 +113,10 @@ contract GSMRouter is Ownable, IGSMRouter {
      * @return outputAmount Amount of output token received
      */
     function swapFromGHO(address token, uint256 ghoAmount, uint256 minOutputAmount) external returns (uint256) {
-        if (ghoAmount == 0) revert InvalidAmount();
+        if (ghoAmount < 1) revert InvalidAmount();
         if (token != USDC && token != USDT) revert InvalidToken();
 
-        address gsmAddress = token == USDC ? gsmUSDC : gsmUSDT;
-        address stataToken = token == USDC ? STATA_USDC : STATA_USDT;
+        (address gsmAddress, address stataToken) = token == USDC ? (gsmUSDC, STATA_USDC) : (gsmUSDT, STATA_USDT);
 
         // Transfer GHO from user
         IERC20(GHO).safeTransferFrom(msg.sender, address(this), ghoAmount);
