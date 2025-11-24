@@ -6,9 +6,14 @@ pragma solidity 0.8.30;
  * @notice Interface for GSMRouter contract
  */
 interface IGSMRouter {
+    
+    /// @notice Thrown when an invalid or unsupported token address is provided
     error InvalidToken();
+    /// @notice Thrown when the input amount is zero or invalid
     error InvalidAmount();
+    /// @notice Thrown when the output amount is below the minimum required (slippage protection)
     error SlippageExceeded();
+    /// @notice Thrown when a zero address is provided where a valid address is required
     error ZeroAddress();
 
     /**

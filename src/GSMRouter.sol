@@ -18,64 +18,40 @@ contract GSMRouter is Ownable, IGSMRouter {
     using SafeERC20 for IERC20;
 
     // Token Constants
-    /// @notice Address of USDC token
     address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-    /// @notice Address of USDT token
     address public constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
-    /// @notice Address of GHO token
     address public constant GHO = 0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f;
 
     // Static aTokens Constants
-    /// @notice Address of Static aToken for USDC
     address public constant STATA_USDC = 0xD4fa2D31b7968E448877f69A96DE69f5de8cD23E;
-    /// @notice Address of Static aToken for USDT
     address public constant STATA_USDT = 0x7Bc3485026Ac48b6cf9BaF0A377477Fff5703Af8;
 
     // GSM State Variables
-    /// @notice Address of GSM for USDC
     address public gsmUSDC;
-    /// @notice Address of GSM for USDT
     address public gsmUSDT;
 
-    /**
-     * @notice Constructor to initialize the contract
-     * @param _owner Address of the contract owner
-     * @param _gsmUSDC Address of the GSM for USDC
-     * @param _gsmUSDT Address of the GSM for USDT
-     */
+    /// @dev Constructor to initialize the contract with owner and GSM addresses
     constructor(address _owner, address _gsmUSDC, address _gsmUSDT) Ownable(_owner) {
         if (_gsmUSDC == address(0) || _gsmUSDT == address(0)) revert ZeroAddress();
         gsmUSDC = _gsmUSDC;
         gsmUSDT = _gsmUSDT;
     }
 
-    /**
-     * @notice Updates the GSM address for USDC
-     * @param _gsmUSDC New GSM USDC address
-     */
+    /// @inheritdoc IGSMRouter
     function setGsmUSDC(address _gsmUSDC) external onlyOwner {
         if (_gsmUSDC == address(0)) revert ZeroAddress();
         gsmUSDC = _gsmUSDC;
         emit GsmUSDCUpdated(_gsmUSDC);
     }
 
-    /**
-     * @notice Updates the GSM address for USDT
-     * @param _gsmUSDT New GSM USDT address
-     */
+    /// @inheritdoc IGSMRouter
     function setGsmUSDT(address _gsmUSDT) external onlyOwner {
         if (_gsmUSDT == address(0)) revert ZeroAddress();
         gsmUSDT = _gsmUSDT;
         emit GsmUSDTUpdated(_gsmUSDT);
     }
 
-    /**
-     * @notice Swap USDC or USDT to GHO
-     * @param token Input token (USDC or USDT)
-     * @param amount Amount of input token
-     * @param minGHOAmount Minimum GHO to receive (slippage protection)
-     * @return ghoAmount Amount of GHO received
-     */
+    /// @inheritdoc IGSMRouter
     function swapToGHO(address token, uint256 amount, uint256 minGHOAmount) external returns (uint256) {
         if (amount < 1) revert InvalidAmount();
         if (token != USDC && token != USDT) revert InvalidToken();
@@ -105,13 +81,7 @@ contract GSMRouter is Ownable, IGSMRouter {
         return ghoAmount;
     }
 
-    /**
-     * @notice Swap GHO back to USDC or USDT
-     * @param token Output token (USDC or USDT)
-     * @param ghoAmount Amount of GHO to swap
-     * @param minOutputAmount Minimum output token to receive
-     * @return outputAmount Amount of output token received
-     */
+    /// @inheritdoc IGSMRouter
     function swapFromGHO(address token, uint256 ghoAmount, uint256 minOutputAmount) external returns (uint256) {
         if (ghoAmount < 1) revert InvalidAmount();
         if (token != USDC && token != USDT) revert InvalidToken();
@@ -140,13 +110,7 @@ contract GSMRouter is Ownable, IGSMRouter {
         return outputAmount;
     }
 
-    /**
-     * @notice Preview how much GHO will be received for a given amount
-     * @param token Input token
-     * @param amount Input amount (stataToken amount)
-     * @return ghoAmount Expected GHO amount (after fees)
-     * @return fee Fee amount
-     */
+    /// @inheritdoc IGSMRouter
     function previewSwapToGHO(address token, uint256 amount) external view returns (uint256, uint256) {
         if (token != USDC && token != USDT) revert InvalidToken();
 
@@ -158,13 +122,7 @@ contract GSMRouter is Ownable, IGSMRouter {
         return (ghoAmount, fee);
     }
 
-    /**
-     * @notice Preview how much output token will be received for a given GHO amount
-     * @param token Output token (USDC or USDT)
-     * @param ghoAmount GHO amount to swap
-     * @return assetAmount Expected output token amount (stataToken, after fees)
-     * @return fee Fee amount
-     */
+    /// @inheritdoc IGSMRouter
     function previewSwapFromGHO(address token, uint256 ghoAmount) external view returns (uint256, uint256) {
         if (token != USDC && token != USDT) revert InvalidToken();
 
