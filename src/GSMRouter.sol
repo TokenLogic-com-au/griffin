@@ -38,20 +38,6 @@ contract GSMRouter is Ownable, IGSMRouter {
     }
 
     /// @inheritdoc IGSMRouter
-    function setGsmUSDC(address _gsmUSDC) external onlyOwner {
-        if (_gsmUSDC == address(0)) revert ZeroAddress();
-        gsmUSDC = _gsmUSDC;
-        emit GsmUSDCUpdated(_gsmUSDC);
-    }
-
-    /// @inheritdoc IGSMRouter
-    function setGsmUSDT(address _gsmUSDT) external onlyOwner {
-        if (_gsmUSDT == address(0)) revert ZeroAddress();
-        gsmUSDT = _gsmUSDT;
-        emit GsmUSDTUpdated(_gsmUSDT);
-    }
-
-    /// @inheritdoc IGSMRouter
     function swapToGHO(address token, uint256 amount, uint256 minGHOAmount) external returns (uint256) {
         if (amount < 1) revert InvalidAmount();
         if (token != USDC && token != USDT) revert InvalidToken();
@@ -111,6 +97,20 @@ contract GSMRouter is Ownable, IGSMRouter {
         emit SwapFromGHO(msg.sender, token, ghoAmount, outputAmount);
 
         return outputAmount;
+    }
+
+    /// @inheritdoc IGSMRouter
+    function setGsmUSDC(address _gsmUSDC) external onlyOwner {
+        if (_gsmUSDC == address(0)) revert ZeroAddress();
+        gsmUSDC = _gsmUSDC;
+        emit GsmUSDCUpdated(_gsmUSDC);
+    }
+
+    /// @inheritdoc IGSMRouter
+    function setGsmUSDT(address _gsmUSDT) external onlyOwner {
+        if (_gsmUSDT == address(0)) revert ZeroAddress();
+        gsmUSDT = _gsmUSDT;
+        emit GsmUSDTUpdated(_gsmUSDT);
     }
 
     /// @inheritdoc IGSMRouter
