@@ -47,8 +47,8 @@ interface IGSM {
     /**
      * @notice Get asset amount for buying with specific GHO amount
      * @param maxGhoAmount Maximum GHO amount to spend
-     * @return ghoSold Amount of GHO that would be sold
      * @return assetBought Amount of asset that would be received
+     * @return ghoSold Amount of GHO that would be sold
      * @return grossAmount Gross amount before fees
      * @return fee Fee amount
      */

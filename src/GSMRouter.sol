@@ -91,11 +91,14 @@ contract GSMRouter is Ownable, IGSMRouter {
         // Transfer GHO from user
         IERC20(GHO).safeTransferFrom(msg.sender, address(this), ghoAmount);
 
-        // Step 1: Swap GHO for stataToken via GSM
-        IERC20(GHO).forceApprove(gsmAddress, ghoAmount);
-        (uint256 stataAmount,) = IGSM(gsmAddress).buyAsset(0, address(this));
+        // Step 1: Calculate exact stataToken amount to buy with GHO
+        (uint256 stataAmountToBuy,,,) = IGSM(gsmAddress).getAssetAmountForBuyAsset(ghoAmount);
 
-        // Step 2: Redeem stataToken for underlying asset (ERC-4626 vault)
+        // Step 2: Swap GHO for stataToken via GSM
+        IERC20(GHO).forceApprove(gsmAddress, ghoAmount);
+        (uint256 stataAmount,) = IGSM(gsmAddress).buyAsset(stataAmountToBuy, address(this));
+
+        // Step 3: Redeem stataToken for underlying asset (ERC-4626 vault)
         // The stataToken handles Aave withdrawal internally
         uint256 outputAmount = IStaticAToken(stataToken).redeem(stataAmount, address(this), address(this));
 
@@ -114,11 +117,14 @@ contract GSMRouter is Ownable, IGSMRouter {
     function previewSwapToGHO(address token, uint256 amount) external view returns (uint256, uint256) {
         if (token != USDC && token != USDT) revert InvalidToken();
 
-        address gsmAddress = token == USDC ? gsmUSDC : gsmUSDT;
+        (address gsmAddress, address stataToken) = token == USDC ? (gsmUSDC, STATA_USDC) : (gsmUSDT, STATA_USDT);
+
+        // Convert underlying amount to shares (stataToken)
+        uint256 sharesAmount = IStaticAToken(stataToken).previewDeposit(amount);
 
         // Get preview from GSM - this is a simplified preview
         // Actual amount may vary slightly due to interest accrual in Aave
-        (, uint256 ghoAmount,, uint256 fee) = IGSM(gsmAddress).getGhoAmountForSellAsset(amount);
+        (, uint256 ghoAmount,, uint256 fee) = IGSM(gsmAddress).getGhoAmountForSellAsset(sharesAmount);
         return (ghoAmount, fee);
     }
 
@@ -126,10 +132,14 @@ contract GSMRouter is Ownable, IGSMRouter {
     function previewSwapFromGHO(address token, uint256 ghoAmount) external view returns (uint256, uint256) {
         if (token != USDC && token != USDT) revert InvalidToken();
 
-        address gsmAddress = token == USDC ? gsmUSDC : gsmUSDT;
+        (address gsmAddress, address stataToken) = token == USDC ? (gsmUSDC, STATA_USDC) : (gsmUSDT, STATA_USDT);
 
         // Get preview from GSM
-        (, uint256 assetAmount,, uint256 fee) = IGSM(gsmAddress).getAssetAmountForBuyAsset(ghoAmount);
-        return (assetAmount, fee);
+        (uint256 assetAmount,,, uint256 fee) = IGSM(gsmAddress).getAssetAmountForBuyAsset(ghoAmount);
+
+        // Convert shares to underlying amount
+        uint256 outputAmount = IStaticAToken(stataToken).previewRedeem(assetAmount);
+
+        return (outputAmount, fee);
     }
 }

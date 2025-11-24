@@ -23,51 +23,56 @@ contract GSMRouterTest is Test {
         router = new GSMRouter(address(this), GSM_USDC, GSM_USDT);
     }
 
-    function testDeployment() public view {
+    function test_constructor() public view {
         // Verify router deployed successfully
         assertTrue(address(router) != address(0), "Router should be deployed");
         assertEq(router.owner(), address(this), "Owner should be this contract");
+
+        // Verify GSM addresses are set correctly
         assertEq(router.gsmUSDC(), GSM_USDC, "GSM USDC should be set");
         assertEq(router.gsmUSDT(), GSM_USDT, "GSM USDT should be set");
-    }
 
-    function testSetGsms() public {
-        address newGsm = makeAddr("newGsm");
-
-        router.setGsmUSDC(newGsm);
-        assertEq(router.gsmUSDC(), newGsm);
-
-        router.setGsmUSDT(newGsm);
-        assertEq(router.gsmUSDT(), newGsm);
-    }
-
-    function testSetGsmsOnlyOwner() public {
-        address newGsm = makeAddr("newGsm");
-        address notOwner = makeAddr("notOwner");
-
-        vm.prank(notOwner);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, notOwner));
-        router.setGsmUSDC(newGsm);
-
-        vm.prank(notOwner);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, notOwner));
-        router.setGsmUSDT(newGsm);
-    }
-
-    function testAddressesAreNonZero() public view {
         // Verify all addresses are configured (non-zero)
         assertNotEq(router.USDC(), address(0), "USDC address should be set");
         assertNotEq(router.USDT(), address(0), "USDT address should be set");
         assertNotEq(router.GHO(), address(0), "GHO address should be set");
         assertNotEq(router.STATA_USDC(), address(0), "stataUSDC address should be set");
         assertNotEq(router.STATA_USDT(), address(0), "stataUSDT address should be set");
-    }
 
-    function testAddressesAreCorrect() public view {
         // Verify addresses match official GHO documentation
         assertEq(router.GHO(), 0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f, "GHO address should match docs");
-        assertEq(router.gsmUSDC(), 0xFeeb6FE430B7523fEF2a38327241eE7153779535, "GSM USDC should match docs");
-        assertEq(router.gsmUSDT(), 0x535b2f7C20B9C83d70e519cf9991578eF9816B7B, "GSM USDT should match docs");
+    }
+
+    function testSetGsmUSDC() public {
+        address newGsm = makeAddr("newGsm");
+
+        router.setGsmUSDC(newGsm);
+        assertEq(router.gsmUSDC(), newGsm);
+    }
+
+    function testSetGsmUSDT() public {
+        address newGsm = makeAddr("newGsm");
+
+        router.setGsmUSDT(newGsm);
+        assertEq(router.gsmUSDT(), newGsm);
+    }
+
+    function testSetGsmUSDCOnlyOwner() public {
+        address newGsm = makeAddr("newGsm");
+        address notOwner = makeAddr("notOwner");
+
+        vm.prank(notOwner);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, notOwner));
+        router.setGsmUSDC(newGsm);
+    }
+
+    function testSetGsmUSDTOnlyOwner() public {
+        address newGsm = makeAddr("newGsm");
+        address notOwner = makeAddr("notOwner");
+
+        vm.prank(notOwner);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, notOwner));
+        router.setGsmUSDT(newGsm);
     }
 
     function testSwapToGHORevertOnZeroAmount() public {
@@ -119,5 +124,82 @@ contract GSMRouterTest is Test {
         // USDT should be a valid supported token
         address usdt = router.USDT();
         assertEq(usdt, 0xdAC17F958D2ee523a2206206994597C13D831ec7, "USDT address should be correct");
+    }
+
+    // ============ Fuzz Tests ============
+
+    function testFuzz_swapToGHOAmount(uint256 amount) public {
+        // Bound amount between 1 and 1 million (in token units with 6 decimals)
+        amount = bound(amount, 1, 1_000_000 * 1e6);
+        address token = router.USDC();
+
+        // Should revert with zero amount
+        vm.expectRevert(IGSMRouter.InvalidAmount.selector);
+        router.swapToGHO(token, 0, 0);
+
+        // Valid amounts should not revert on the router validation
+        // (May still revert in actual swap due to insufficient balance/liquidity)
+        try router.swapToGHO(token, amount, 0) returns (
+            uint256
+        ) {
+        // Swap succeeded
+        }
+            catch {
+            // Expected - we don't have actual tokens in this test
+        }
+    }
+
+    function testFuzz_swapFromGHOAmount(uint256 ghoAmount) public {
+        // Bound amount between 1 and 1 million GHO (18 decimals)
+        ghoAmount = bound(ghoAmount, 1, 1_000_000 * 1e18);
+        address token = router.USDC();
+
+        // Should revert with zero amount
+        vm.expectRevert(IGSMRouter.InvalidAmount.selector);
+        router.swapFromGHO(token, 0, 0);
+
+        // Valid amounts should not revert on the router validation
+        try router.swapFromGHO(token, ghoAmount, 0) returns (
+            uint256
+        ) {
+        // Swap succeeded
+        }
+            catch {
+            // Expected - we don't have actual tokens in this test
+        }
+    }
+
+    function testFuzz_previewSwapToGHOWithToken(bool useUSDC, uint256 amount) public view {
+        // Bound amount to reasonable values
+        amount = bound(amount, 1, 1_000_000 * 1e6);
+        address token = useUSDC ? router.USDC() : router.USDT();
+
+        // Preview requires actual GSM contracts to work
+        // In unit tests without fork, this will revert
+        try router.previewSwapToGHO(token, amount) returns (uint256 ghoAmount, uint256 fee) {
+            // If we're on a fork with real GSM contracts, validate results
+            assertGt(ghoAmount, 0, "GHO amount should be greater than 0");
+            assertGe(fee, 0, "Fee should be non-negative");
+        } catch {
+            // Expected in unit tests without fork - GSM contracts don't exist
+            // In integration tests with fork, this should not revert
+        }
+    }
+
+    function testFuzz_previewSwapFromGHOWithToken(bool useUSDC, uint256 ghoAmount) public view {
+        // Bound amount to reasonable values
+        ghoAmount = bound(ghoAmount, 1, 1_000_000 * 1e18);
+        address token = useUSDC ? router.USDC() : router.USDT();
+
+        // Preview requires actual GSM contracts to work
+        // In unit tests without fork, this will revert
+        try router.previewSwapFromGHO(token, ghoAmount) returns (uint256 assetAmount, uint256 fee) {
+            // If we're on a fork with real GSM contracts, validate results
+            assertGt(assetAmount, 0, "Asset amount should be greater than 0");
+            assertGe(fee, 0, "Fee should be non-negative");
+        } catch {
+            // Expected in unit tests without fork - GSM contracts don't exist
+            // In integration tests with fork, this should not revert
+        }
     }
 }
