@@ -50,16 +50,16 @@ interface IGSMRouter {
     );
 
     /**
-     * @notice Emitted when the GSM address for USDC is updated
-     * @param newGsm The new GSM USDC address
+     * @notice Emitted when a token is mapped to GSM
+     * @param token The address of the underlying token
+     * @param stataToken The address of the stata token
+     * @param gsm The address of the GSM
      */
-    event GsmUSDCUpdated(address indexed newGsm);
-
-    /**
-     * @notice Emitted when the GSM address for USDT is updated
-     * @param newGsm The new GSM USDT address
-     */
-    event GsmUSDTUpdated(address indexed newGsm);
+    event TokenToGsmMapped(
+        address indexed token,
+        address indexed stataToken,
+        address indexed gsm
+    );
 
     /**
      * Updates a token to GSM configuration

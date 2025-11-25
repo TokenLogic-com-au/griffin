@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {Script} from "forge-std/Script.sol";
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -37,8 +39,8 @@ contract GSMRouterTest is Script {
 
         router = new GSMRouter(msg.sender, GSM_USDC, GSM_USDT);
 
-        deal(address(this), router.USDC(), 10_000_000e6);
-        deal(address(this), router.USDT(), 10_000_000e6);
+        vm.deal(address(this), router.USDC(), 10_000_000e6);
+        vm.deal(address(this), router.USDT(), 10_000_000e6);
     }
 
     function test_constructor() public {}

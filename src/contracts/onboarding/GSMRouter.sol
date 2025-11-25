@@ -30,7 +30,7 @@ contract GSMRouter is Ownable, IGSMRouter {
      * @param gho Address of the GHO token on the deployed network
      */
 
-    constructor(address owner, address gho) Ownable(_owner) {
+    constructor(address owner, address gho) Ownable(owner) {
         require(gho != address(0), ZeroAddress());
 
         GHO = gho;
@@ -78,7 +78,7 @@ contract GSMRouter is Ownable, IGSMRouter {
         uint256 ghoAmount,
         uint256 minOutputAmount
     ) external returns (uint256) {
-        require(amount > 0, InvalidAmount());
+        require(ghoAmount > 0, InvalidAmount());
 
         address stataToken = tokenToGsm[token];
         address gsm = tokenToGsm[token][stataToken];
@@ -156,7 +156,7 @@ contract GSMRouter is Ownable, IGSMRouter {
         address token,
         uint256 ghoAmount
     ) external view returns (uint256, uint256) {
-        require(amount > 0, InvalidAmount());
+        require(ghoAmount > 0, InvalidAmount());
 
         address stataToken = tokenToGsm[token];
         address gsm = tokenToGsm[token][stataToken];
