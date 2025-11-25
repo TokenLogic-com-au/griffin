@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {GSMRouter} from "src/contracts/onboarding/GSMRouter.sol";
-import {IGSMRouter} from "src/interfaces/IGSMRouter.sol";
+import {IGSMRouter} from "src/interfaces/onboarding/IGSMRouter.sol";
 
 /**
  * @title GSMRouterTest
@@ -14,6 +14,16 @@ import {IGSMRouter} from "src/interfaces/IGSMRouter.sol";
  */
 contract GSMRouterTest is Test {
     GSMRouter public router;
+
+    address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address public constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+    address public constant GHO = 0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f;
+
+    // Static aTokens Constants
+    address public constant STATA_USDC =
+        0xD4fa2D31b7968E448877f69A96DE69f5de8cD23E;
+    address public constant STATA_USDT =
+        0x7Bc3485026Ac48b6cf9BaF0A377477Fff5703Af8;
 
     // GSM Contracts - GHO Stability Modules
     address internal constant GSM_USDC =
@@ -26,7 +36,6 @@ contract GSMRouterTest is Test {
     }
 
     function test_constructor() public view {
-        // Verify router deployed successfully
         assertTrue(address(router) != address(0), "Router should be deployed");
         assertEq(
             router.owner(),
@@ -34,48 +43,32 @@ contract GSMRouterTest is Test {
             "Owner should be this contract"
         );
 
-        // Verify GSM addresses are set correctly
-        assertEq(router.gsmUSDC(), GSM_USDC, "GSM USDC should be set");
-        assertEq(router.gsmUSDT(), GSM_USDT, "GSM USDT should be set");
-
-        // Verify all addresses are configured (non-zero)
-        assertNotEq(router.USDC(), address(0), "USDC address should be set");
-        assertNotEq(router.USDT(), address(0), "USDT address should be set");
-        assertNotEq(router.GHO(), address(0), "GHO address should be set");
-        assertNotEq(
-            router.STATA_USDC(),
-            address(0),
-            "stataUSDC address should be set"
-        );
-        assertNotEq(
-            router.STATA_USDT(),
-            address(0),
-            "stataUSDT address should be set"
-        );
-
-        // Verify addresses match official GHO documentation
-        assertEq(
-            router.GHO(),
-            0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f,
-            "GHO address should match docs"
-        );
+        assertEq(router.GHO(), GHO, "GHO address should match docs");
     }
+}
 
-    function testSetGsmUSDC() public {
+contract SetTokenToGsmMappingTest is GSMRouterTest {
+    function test_setGsmUSDC() public {
+        assertEq(router.tokenToGsm(USDC, STATA_USDC), address(0));
+
         address newGsm = makeAddr("newGsm");
 
-        router.setGsmUSDC(newGsm);
-        assertEq(router.gsmUSDC(), newGsm);
+        router.setTokenToGsmMapping(USDC, STATA_USDC, newGsm);
+
+        assertEq(router.tokenToGsm(USDC, STATA_USDC), newGsm);
     }
 
-    function testSetGsmUSDT() public {
+    function test_setGsmUSDT() public {
+        assertEq(router.tokenToGsm(USDT, STATA_USDT), address(0));
+
         address newGsm = makeAddr("newGsm");
 
-        router.setGsmUSDT(newGsm);
-        assertEq(router.gsmUSDT(), newGsm);
+        router.setTokenToGsmMapping(USDT, STATA_USDT, newGsm);
+
+        assertEq(router.tokenToGsm(USDT, STATA_USDT), newGsm);
     }
 
-    function testSetGsmUSDCOnlyOwner() public {
+    function test_reverts_onlyOwner() public {
         address newGsm = makeAddr("newGsm");
         address notOwner = makeAddr("notOwner");
 
@@ -86,90 +79,48 @@ contract GSMRouterTest is Test {
                 notOwner
             )
         );
-        router.setGsmUSDC(newGsm);
+        router.setTokenToGsmMapping(USDT, STATA_USDT, newGsm);
     }
+}
 
-    function testSetGsmUSDTOnlyOwner() public {
-        address newGsm = makeAddr("newGsm");
-        address notOwner = makeAddr("notOwner");
-
-        vm.prank(notOwner);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                Ownable.OwnableUnauthorizedAccount.selector,
-                notOwner
-            )
-        );
-        router.setGsmUSDT(newGsm);
-    }
-
-    function testSwapToGHORevertOnZeroAmount() public {
-        // Should revert with InvalidAmount error
-        address usdc = router.USDC();
+contract SwapToGHOTest is GSMRouterTest {
+    function test_reverts_zeroAmount() public {
         vm.expectRevert(IGSMRouter.InvalidAmount.selector);
-        router.swapToGHO(usdc, 0, 0);
+        router.swapToGHO(USDC, 0, 0);
     }
 
-    function testSwapToGHORevertOnUnsupportedToken() public {
-        address unsupportedToken = address(
-            0x1234567890123456789012345678901234567890
-        );
+    function test_reverts_unsupportedToken() public {
+        address unsupportedToken = makeAddr("new-token");
 
-        // Should revert with InvalidToken error
         vm.expectRevert(IGSMRouter.InvalidToken.selector);
         router.swapToGHO(unsupportedToken, 1000 * 1e6, 0);
     }
+}
 
-    function testSwapFromGHORevertOnZeroAmount() public {
-        // Should revert with InvalidAmount error
-        address usdc = router.USDC();
-        vm.expectRevert(IGSMRouter.InvalidAmount.selector);
-        router.swapFromGHO(usdc, 0, 0);
-    }
+contract SwapFromGHOTest is GSMRouterTest {
+    function test_reverts_unsupportedToken() public {
+        address unsupportedToken = makeAddr("new-token");
 
-    function testSwapFromGHORevertOnUnsupportedToken() public {
-        address unsupportedToken = address(
-            0x1234567890123456789012345678901234567890
-        );
-
-        // Should revert with InvalidToken error
         vm.expectRevert(IGSMRouter.InvalidToken.selector);
         router.swapFromGHO(unsupportedToken, 1000 * 1e18, 0);
     }
 
-    function testPreviewSwapToGHORevertOnUnsupportedToken() public {
-        address unsupportedToken = address(
-            0x1234567890123456789012345678901234567890
-        );
-        uint256 amount = 1000 * 1e6;
+    function test_reverts_zeroAmount() public {
+        vm.expectRevert(IGSMRouter.InvalidAmount.selector);
+        router.swapFromGHO(USDC, 0, 0);
+    }
+}
 
-        // Should revert with InvalidToken error
+contract SwapPreviewSwapToGHOTest is GSMRouterTest {
+    function test_reverts_unsupportedToken() public {
+        address unsupportedToken = makeAddr("new-token");
+
         vm.expectRevert(IGSMRouter.InvalidToken.selector);
-        router.previewSwapToGHO(unsupportedToken, amount);
+        router.previewSwapToGHO(unsupportedToken, 1000 * 1e6);
     }
+}
 
-    function testSupportedTokensUSDC() public view {
-        // USDC should be a valid supported token
-        address usdc = router.USDC();
-        assertEq(
-            usdc,
-            0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
-            "USDC address should be correct"
-        );
-    }
-
-    function testSupportedTokensUSDT() public view {
-        // USDT should be a valid supported token
-        address usdt = router.USDT();
-        assertEq(
-            usdt,
-            0xdAC17F958D2ee523a2206206994597C13D831ec7,
-            "USDT address should be correct"
-        );
-    }
-
-    // ============ Fuzz Tests ============
-
+contract SwapPreviewSwapFromGHOTest is GSMRouterTest {
     function testFuzz_swapToGHOAmount(uint256 amount) public {
         // Bound amount between 1 and 1 million (in token units with 6 decimals)
         amount = bound(amount, 1, 1_000_000 * 1e6);

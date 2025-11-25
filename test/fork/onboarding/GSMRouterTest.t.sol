@@ -64,12 +64,7 @@ contract SwapToGHOTest is GSMRouterTest {
         vm.stopPrank();
     }
 
-    /**
-     * @notice Test USDT to GHO swap
-     */
     function testSwapUSDTToGHO() public {
-        console.log("--- Test: USDT to GHO Swap ---");
-
         uint256 usdtAmount = 1000 * 1e6; // 1000 USDT
         address user = USDT_WHALE;
         address usdt = router.USDT();
@@ -77,86 +72,48 @@ contract SwapToGHOTest is GSMRouterTest {
         vm.startPrank(user);
 
         uint256 initialUsdt = IERC20(usdt).balanceOf(user);
-        console.log("Initial USDT balance:", initialUsdt / 1e6);
         require(initialUsdt >= usdtAmount, "Whale should have enough USDT");
 
         IERC20(usdt).forceApprove(address(router), usdtAmount);
-        console.log("Swapping 1k USDT");
         uint256 ghoReceived = router.swapToGHO(usdt, usdtAmount, 0);
         require(ghoReceived > 0, "Should receive GHO");
 
-        // Format GHO amount with decimals (18 decimals)
-        console.log(
-            "GHO received: %s.%s GHO",
-            ghoReceived / 1e18,
-            (ghoReceived % 1e18) / 1e14
-        );
-
         vm.stopPrank();
-        console.log("[PASS] USDT swap setup validated\n");
     }
 
-    /**
-     * @notice Test GHO to USDC swap
-     */
     function testSwapGHOToUSDC() public {
-        console.log("--- Test: GHO to USDC Swap ---");
-
-        uint256 ghoAmount = 100 * 1e18; // 100 GHO
+        uint256 ghoAmount = 100 ether;
         address user = GHO_WHALE;
         address gho = router.GHO();
         address usdc = router.USDC();
 
         vm.startPrank(user);
 
-        // Check balance
         uint256 initialGho = IERC20(gho).balanceOf(user);
         require(initialGho >= ghoAmount, "Whale should have enough GHO");
 
         IERC20(gho).approve(address(router), ghoAmount);
-        console.log("Swapping 100 GHO to USDC");
         uint256 usdcReceived = router.swapFromGHO(usdc, ghoAmount, 0);
         require(usdcReceived > 0, "Should receive USDC");
 
-        console.log(
-            "USDC received: %s.%s USDC",
-            usdcReceived / 1e6,
-            (usdcReceived % 1e6)
-        );
-
         vm.stopPrank();
-        console.log("[PASS] GHO -> USDC swap validated\n");
     }
 
-    /**
-     * @notice Test GHO to USDT swap
-     */
     function testSwapGHOToUSDT() public {
-        console.log("--- Test: GHO to USDT Swap ---");
-
-        uint256 ghoAmount = 100 * 1e18; // 100 GHO
+        uint256 ghoAmount = 100 ether;
         address user = GHO_WHALE;
         address gho = router.GHO();
         address usdt = router.USDT();
 
         vm.startPrank(user);
 
-        // Check balance
         uint256 initialGho = IERC20(gho).balanceOf(user);
         require(initialGho >= ghoAmount, "Whale should have enough GHO");
 
         IERC20(gho).approve(address(router), ghoAmount);
-        console.log("Swapping 100 GHO to USDT");
         uint256 usdtReceived = router.swapFromGHO(usdt, ghoAmount, 0);
         require(usdtReceived > 0, "Should receive USDT");
 
-        console.log(
-            "USDT received: %s.%s USDT",
-            usdtReceived / 1e6,
-            (usdtReceived % 1e6)
-        );
-
         vm.stopPrank();
-        console.log("[PASS] GHO -> USDT swap validated\n");
     }
 }
