@@ -6,13 +6,19 @@ pragma solidity 0.8.30;
  * @notice Interface for GSMRouter contract
  */
 interface IGSMRouter {
-    /// @dev Thrown when an invalid or unsupported token address is provided
+    /// @dev GSM not configured for the given token
+    error InvalidGsm();
+
+    /// @dev Unsupported token provided
     error InvalidToken();
-    /// @dev Thrown when the input amount is zero or invalid
+
+    /// @dev Amount must be greater than zero
     error InvalidAmount();
-    /// @dev Thrown when the output amount is below the minimum required (slippage protection)
+
+    /// @dev Swap amount is lower than minimum expected amount
     error SlippageExceeded();
-    /// @dev Thrown when a zero address is provided where a valid address is required
+
+    /// @dev Zero address is not allowed
     error ZeroAddress();
 
     /**
@@ -22,7 +28,12 @@ interface IGSMRouter {
      * @param inputAmount The amount of input tokens sold
      * @param ghoAmount The amount of GHO received
      */
-    event SwapToGHO(address indexed user, address indexed inputToken, uint256 inputAmount, uint256 ghoAmount);
+    event SwapToGHO(
+        address indexed user,
+        address indexed inputToken,
+        uint256 inputAmount,
+        uint256 ghoAmount
+    );
 
     /**
      * @notice Emitted when a swap from GHO is completed
@@ -31,7 +42,12 @@ interface IGSMRouter {
      * @param ghoAmount The amount of GHO sold
      * @param outputAmount The amount of output tokens received
      */
-    event SwapFromGHO(address indexed user, address indexed outputToken, uint256 ghoAmount, uint256 outputAmount);
+    event SwapFromGHO(
+        address indexed user,
+        address indexed outputToken,
+        uint256 ghoAmount,
+        uint256 outputAmount
+    );
 
     /**
      * @notice Emitted when the GSM address for USDC is updated
@@ -46,57 +62,83 @@ interface IGSMRouter {
     event GsmUSDTUpdated(address indexed newGsm);
 
     /**
-     * @notice Updates the GSM address for USDC
-     * @dev Only callable by owner
-     * @param _gsmUSDC New GSM USDC address
+     * Updates a token to GSM configuration
+     * @param token Address of the underlying token
+     * @param stataToken Address of the stata token
+     * @param gsm Address of the GSM
      */
-    function setGsmUSDC(address _gsmUSDC) external;
+    function setTokenToGsmMapping(
+        address token,
+        address stataToken,
+        address gsm
+    ) external;
 
     /**
-     * @notice Updates the GSM address for USDT
-     * @dev Only callable by owner
-     * @param _gsmUSDT New GSM USDT address
-     */
-    function setGsmUSDT(address _gsmUSDT) external;
-
-    /**
-     * @notice Swap USDC or USDT to GHO
-     * @param token Input token address (USDC or USDT)
+     * @notice Swap underlying token to GHO
+     * @param token Underlying token address to swap from
      * @param amount Amount of input token to swap
      * @param minGHOAmount Minimum amount of GHO to receive (slippage protection)
      * @return Amount of GHO received
      */
-    function swapToGHO(address token, uint256 amount, uint256 minGHOAmount) external returns (uint256);
+    function swapToGHO(
+        address token,
+        uint256 amount,
+        uint256 minGHOAmount
+    ) external returns (uint256);
 
     /**
-     * @notice Swap GHO back to USDC or USDT
-     * @param token Output token address (USDC or USDT)
+     * @notice Swap GHO back to underlying token
+     * @param token Underlying token address to swap to
      * @param ghoAmount Amount of GHO to swap
      * @param minOutputAmount Minimum amount of output token to receive (slippage protection)
      * @return Amount of output token received
      */
-    function swapFromGHO(address token, uint256 ghoAmount, uint256 minOutputAmount) external returns (uint256);
+    function swapFromGHO(
+        address token,
+        uint256 ghoAmount,
+        uint256 minOutputAmount
+    ) external returns (uint256);
 
     /**
      * @notice Preview the amount of GHO received for a given input amount
      * @dev This is an estimation and actual results may vary slightly due to interest accrual
-     * @param token Input token address (USDC or USDT)
+     * @param token Underlying token address to swap from
      * @param amount Amount of input token to sell
      * @return ghoAmount Expected amount of GHO to receive
      * @return fee Fee amount charged by the GSM
      */
-    function previewSwapToGHO(address token, uint256 amount) external view returns (uint256 ghoAmount, uint256 fee);
+    function previewSwapToGHO(
+        address token,
+        uint256 amount
+    ) external view returns (uint256 ghoAmount, uint256 fee);
 
     /**
      * @notice Preview the amount of output token received for a given GHO amount
      * @dev This is an estimation and actual results may vary slightly due to interest accrual
-     * @param token Output token address (USDC or USDT)
+     * @param token Underlying token address to swap to
      * @param ghoAmount Amount of GHO to sell
      * @return assetAmount Expected amount of output token to receive
      * @return fee Fee amount charged by the GSM
      */
-    function previewSwapFromGHO(address token, uint256 ghoAmount)
-        external
-        view
-        returns (uint256 assetAmount, uint256 fee);
+    function previewSwapFromGHO(
+        address token,
+        uint256 ghoAmount
+    ) external view returns (uint256 assetAmount, uint256 fee);
+
+    /**
+     * @notice Returns address of the GHO token on the deployed network
+     * @return Address of the token
+     */
+    function GHO() external view returns (address);
+
+    /**
+     * @notice Returns the address of the GSM corresponding to the underlying token and stataToken
+     * @param token Address of the underlying token
+     * @param stataToken Address of the stataToken
+     * @return Address of the GSM
+     */
+    function tokenToGsm(
+        address token,
+        address stataToken
+    ) external view returns (address);
 }

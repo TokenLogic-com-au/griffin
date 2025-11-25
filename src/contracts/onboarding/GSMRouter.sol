@@ -4,7 +4,8 @@ pragma solidity 0.8.30;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IStaticAToken} from "./interfaces/IStaticAToken.sol";
+
+import {IStaticAToken} from "src/interfaces/IStaticAToken.sol";
 import {IGSM} from "src/interfaces/IGSM.sol";
 import {IGSMRouter} from "src/interfaces/onboarding/IGSMRouter.sol";
 
@@ -18,52 +19,21 @@ contract GSMRouter is Ownable, IGSMRouter {
     using SafeERC20 for IERC20;
 
     /// @inheritdoc IGSMRouter
-    address public immutable USDC;
-
-    /// @inheritdoc IGSMRouter
-    address public immutable USDT;
-
-    /// @inheritdoc IGSMRouter
     address public immutable GHO;
 
     /// @inheritdoc IGSMRouter
-    address public immutable STATA_USDC;
+    mapping(address token => mapping(address stataToken => address gsm))
+        public tokenToGsm;
 
-    /// @inheritdoc IGSMRouter
-    address public immutable STATA_USDT
+    /**
+     * @dev Constructor to initialize the contract with owner and GSM addresses
+     * @param gho Address of the GHO token on the deployed network
+     */
 
-    /// @inheritdoc IGSMRouter
-    address public _gsmUSDC;
-
-    /// @inheritdoc IGSMRouter
-    address public _gsmUSDT;
-
-    /// @dev Constructor to initialize the contract with owner and GSM addresses
-    constructor(
-        address owner,
-        address gsmUSDC,
-        address gsmUSDT,
-        address usdc,
-        address usdt,
-        address gho,
-        address stataUsdc,
-        address stataUsdt
-    ) Ownable(_owner) {
-        require(gsmUSDC != address(0), ZeroAddress());
-        require(gsmUSDT != address(0), ZeroAddress());
-        require(usdc != address(0), ZeroAddress());
-        require(usdt != address(0), ZeroAddress());
+    constructor(address owner, address gho) Ownable(_owner) {
         require(gho != address(0), ZeroAddress());
-        require(stataUsdc != address(0), ZeroAddress());
-        require(stataUsdt != address(0), ZeroAddress());
 
-        gsmUSDC = _gsmUSDC;
-        gsmUSDT = _gsmUSDT;
-        USDC = usdc;
-        USDT = usdt;
         GHO = gho;
-        STATA_USDC = stataUsdc;
-        STATA_USDT = stataUsdt;
     }
 
     /// @inheritdoc IGSMRouter
@@ -73,11 +43,12 @@ contract GSMRouter is Ownable, IGSMRouter {
         uint256 minGHOAmount
     ) external returns (uint256) {
         require(amount > 0, InvalidAmount());
-        require(token == USDC || token == USDT, InvalidToken());
 
-        (address gsmAddress, address stataToken) = token == USDC
-            ? (gsmUSDC, STATA_USDC)
-            : (gsmUSDT, STATA_USDT);
+        address stataToken = tokenToGsm[token];
+        address gsm = tokenToGsm[token][stataToken];
+
+        require(stataToken != address(0), InvalidToken());
+        require(gsm != address(0), InvalidGsm());
 
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
 
@@ -89,13 +60,10 @@ contract GSMRouter is Ownable, IGSMRouter {
         );
 
         // Step 2: Swap stataToken for GHO via GSM
-        IERC20(stataToken).forceApprove(gsmAddress, stataAmount);
-        (, uint256 ghoAmount) = IGSM(gsmAddress).sellAsset(
-            stataAmount,
-            address(this)
-        );
+        IERC20(stataToken).forceApprove(gsm, stataAmount);
+        (, uint256 ghoAmount) = IGSM(gsm).sellAsset(stataAmount, address(this));
 
-        if (ghoAmount < minGHOAmount) revert SlippageExceeded();
+        require(minGHOAmount >= ghoAmount, SlippageExceeded());
 
         IERC20(GHO).safeTransfer(msg.sender, ghoAmount);
 
@@ -111,21 +79,23 @@ contract GSMRouter is Ownable, IGSMRouter {
         uint256 minOutputAmount
     ) external returns (uint256) {
         require(amount > 0, InvalidAmount());
-        require(token == USDC || token == USDT, InvalidToken());
 
-        (address gsmAddress, address stataToken) = token == USDC
-            ? (gsmUSDC, STATA_USDC)
-            : (gsmUSDT, STATA_USDT);
+        address stataToken = tokenToGsm[token];
+        address gsm = tokenToGsm[token][stataToken];
+
+        require(stataToken != address(0), InvalidToken());
+        require(gsm != address(0), InvalidGsm());
 
         IERC20(GHO).safeTransferFrom(msg.sender, address(this), ghoAmount);
 
         // Step 1: Calculate exact stataToken amount to buy with GHO
-        (uint256 stataAmountToBuy, , , ) = IGSM(gsmAddress)
-            .getAssetAmountForBuyAsset(ghoAmount);
+        (uint256 stataAmountToBuy, , , ) = IGSM(gsm).getAssetAmountForBuyAsset(
+            ghoAmount
+        );
 
         // Step 2: Swap GHO for stataToken via GSM
-        IERC20(GHO).forceApprove(gsmAddress, ghoAmount);
-        (uint256 stataAmount, ) = IGSM(gsmAddress).buyAsset(
+        IERC20(GHO).forceApprove(gsm, ghoAmount);
+        (uint256 stataAmount, ) = IGSM(gsm).buyAsset(
             stataAmountToBuy,
             address(this)
         );
@@ -133,13 +103,11 @@ contract GSMRouter is Ownable, IGSMRouter {
         // Step 3: Redeem stataToken for underlying asset
         uint256 outputAmount = IStaticAToken(stataToken).redeem(
             stataAmount,
-            address(this),
+            msg.sender,
             address(this)
         );
 
-        if (outputAmount < minOutputAmount) revert SlippageExceeded();
-
-        IERC20(token).safeTransfer(msg.sender, outputAmount);
+        require(minOutputAmount >= outputAmount, SlippageExceeded());
 
         emit SwapFromGHO(msg.sender, token, ghoAmount, outputAmount);
 
@@ -147,17 +115,18 @@ contract GSMRouter is Ownable, IGSMRouter {
     }
 
     /// @inheritdoc IGSMRouter
-    function setGsmUSDC(address gsmUSDC) external onlyOwner {
-        require(gsmUSDC != address(0), ZeroAddress());
-        _gsmUSDC = gsmUSDC;
-        emit GsmUSDCUpdated(gsmUSDC);
-    }
+    function setTokenToGsmMapping(
+        address token,
+        address stataToken,
+        address gsm
+    ) external onlyOwner {
+        require(token != address(0), ZeroAddress());
+        require(stataToken != address(0), ZeroAddress());
+        require(gsm != address(0), ZeroAddress());
 
-    /// @inheritdoc IGSMRouter
-    function setGsmUSDT(address gsmUSDT) external onlyOwner {
-        require(gsmUSDT != address(0), ZeroAddress());
-        _gsmUSDT = gsmUSDT;
-        emit GsmUSDTUpdated(gsmUSDT);
+        tokenToGsm[token][stataToken][gsm];
+
+        emit TokenToGsmMapped(token, stataToken, gsm);
     }
 
     /// @inheritdoc IGSMRouter
@@ -165,17 +134,19 @@ contract GSMRouter is Ownable, IGSMRouter {
         address token,
         uint256 amount
     ) external view returns (uint256, uint256) {
-        require(token == USDC || token == USDT, InvalidToken());
+        require(amount > 0, InvalidAmount());
 
-        (address gsmAddress, address stataToken) = token == USDC
-            ? (gsmUSDC, STATA_USDC)
-            : (gsmUSDT, STATA_USDT);
+        address stataToken = tokenToGsm[token];
+        address gsm = tokenToGsm[token][stataToken];
+
+        require(stataToken != address(0), InvalidToken());
+        require(gsm != address(0), InvalidGsm());
 
         uint256 sharesAmount = IStaticAToken(stataToken).previewDeposit(amount);
 
         // This is a simplified preview:
         // Actual amount may vary slightly due to interest accrual in Aave
-        (, uint256 ghoAmount, , uint256 fee) = IGSM(gsmAddress)
+        (, uint256 ghoAmount, , uint256 fee) = IGSM(gsm)
             .getGhoAmountForSellAsset(sharesAmount);
         return (ghoAmount, fee);
     }
@@ -185,13 +156,15 @@ contract GSMRouter is Ownable, IGSMRouter {
         address token,
         uint256 ghoAmount
     ) external view returns (uint256, uint256) {
-        require(token == USDC || token == USDT, InvalidToken());
+        require(amount > 0, InvalidAmount());
 
-        (address gsmAddress, address stataToken) = token == USDC
-            ? (gsmUSDC, STATA_USDC)
-            : (gsmUSDT, STATA_USDT);
+        address stataToken = tokenToGsm[token];
+        address gsm = tokenToGsm[token][stataToken];
 
-        (uint256 assetAmount, , , uint256 fee) = IGSM(gsmAddress)
+        require(stataToken != address(0), InvalidToken());
+        require(gsm != address(0), InvalidGsm());
+
+        (uint256 assetAmount, , , uint256 fee) = IGSM(gsm)
             .getAssetAmountForBuyAsset(ghoAmount);
 
         uint256 outputAmount = IStaticAToken(stataToken).previewRedeem(
