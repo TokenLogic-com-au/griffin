@@ -6,6 +6,12 @@ pragma solidity 0.8.30;
  * @notice Interface for GSMRouter contract
  */
 interface IGSMRouter {
+    /// @notice Configuration for a supported token
+    struct TokenConfig {
+        address stataToken;
+        address gsm;
+    }
+
     /// @dev GSM not configured for the given token
     error InvalidGsm();
 
@@ -55,7 +61,7 @@ interface IGSMRouter {
      * @param stataToken The address of the stata token
      * @param gsm The address of the GSM
      */
-    event TokenToGsmMapped(
+    event TokenConfigSet(
         address indexed token,
         address indexed stataToken,
         address indexed gsm
@@ -67,7 +73,7 @@ interface IGSMRouter {
      * @param stataToken Address of the stata token
      * @param gsm Address of the GSM
      */
-    function setTokenToGsmMapping(
+    function setTokenConfig(
         address token,
         address stataToken,
         address gsm
@@ -132,13 +138,12 @@ interface IGSMRouter {
     function GHO() external view returns (address);
 
     /**
-     * @notice Returns the address of the GSM corresponding to the underlying token and stataToken
+     * @notice Returns the configuration for a token
      * @param token Address of the underlying token
-     * @param stataToken Address of the stataToken
-     * @return Address of the GSM
+     * @return stataToken Address of the stataToken
+     * @return gsm Address of the GSM
      */
-    function tokenToGsm(
-        address token,
-        address stataToken
-    ) external view returns (address);
+    function tokenConfig(
+        address token
+    ) external view returns (address stataToken, address gsm);
 }

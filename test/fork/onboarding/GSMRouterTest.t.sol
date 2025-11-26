@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {Script} from "forge-std/Script.sol";
+import {Test} from "forge-std/Test.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {IGSM} from "src/interfaces/IGSM.sol";
 import {GSMRouter} from "src/contracts/onboarding/GSMRouter.sol";
 
 /**
@@ -15,8 +13,7 @@ import {GSMRouter} from "src/contracts/onboarding/GSMRouter.sol";
  * @notice Integration tests for GSMRouter on mainnet fork
  * @dev Run with: forge test --match-path test/fork/onboarding/GSMRouterTest.t.sol -vvv
  */
-contract GSMRouterTest is Script {
-    using SafeERC20 for IERC20;
+contract GSMRouterTest is Test {
 
     GSMRouter public router;
 
@@ -34,87 +31,98 @@ contract GSMRouterTest is Script {
     address constant GSM_USDC = 0xFeeb6FE430B7523fEF2a38327241eE7153779535;
     address constant GSM_USDT = 0x535b2f7C20B9C83d70e519cf9991578eF9816B7B;
 
+    // Whale addresses for fork testing
+    address constant USDC_WHALE = 0x47ac0Fb4F2D84898e4D9E7b4DaB3C24507a6D503; // Binance
+    address constant USDT_WHALE = 0xF977814e90dA44bFA03b6295A0616a897441aceC; // Binance
+    address constant GHO_WHALE = 0x4B16c5dE96EB2117bBE5fd171E4d203624B014aa;  // Aave Collector
+
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("mainnet"));
 
-        router = new GSMRouter(msg.sender, GSM_USDC, GSM_USDT);
+        router = new GSMRouter(address(this), GHO);
 
-        vm.deal(address(this), router.USDC(), 10_000_000e6);
-        vm.deal(address(this), router.USDT(), 10_000_000e6);
+        // Configure token mappings
+        router.setTokenConfig(USDC, STATA_USDC, GSM_USDC);
+        router.setTokenConfig(USDT, STATA_USDT, GSM_USDT);
     }
 
-    function test_constructor() public {}
+    function test_constructor() public view {
+        assertEq(router.GHO(), GHO);
+        assertEq(router.owner(), address(this));
+
+        (address usdcStata, address usdcGsm) = router.tokenConfig(USDC);
+        assertEq(usdcStata, STATA_USDC);
+        assertEq(usdcGsm, GSM_USDC);
+
+        (address usdtStata, address usdtGsm) = router.tokenConfig(USDT);
+        assertEq(usdtStata, STATA_USDT);
+        assertEq(usdtGsm, GSM_USDT);
+    }
 }
 
 contract SwapToGHOTest is GSMRouterTest {
-    function testSwapUSDCToGHO() public {
+    function test_swapUSDCToGHO() public {
         uint256 usdcAmount = 1000 * 1e6; // 1000 USDC
         address user = USDC_WHALE;
-        address usdc = router.USDC();
 
         vm.startPrank(user);
 
-        uint256 initialUsdc = IERC20(usdc).balanceOf(user);
-        require(initialUsdc >= usdcAmount, "Whale should have enough USDC");
+        assertGe(IERC20(USDC).balanceOf(user), usdcAmount, "Whale should have enough USDC");
 
-        IERC20(usdc).approve(address(router), usdcAmount);
-        uint256 ghoReceived = router.swapToGHO(usdc, usdcAmount, 0);
+        IERC20(USDC).approve(address(router), usdcAmount);
+        uint256 ghoReceived = router.swapToGHO(USDC, usdcAmount, 0);
 
-        // this should be assert, not require
-        require(ghoReceived > 0, "Should receive GHO");
+        assertGt(ghoReceived, 0, "Should receive GHO");
 
         vm.stopPrank();
     }
 
-    function testSwapUSDTToGHO() public {
+    function test_swapUSDTToGHO() public {
         uint256 usdtAmount = 1000 * 1e6; // 1000 USDT
         address user = USDT_WHALE;
-        address usdt = router.USDT();
 
         vm.startPrank(user);
 
-        uint256 initialUsdt = IERC20(usdt).balanceOf(user);
-        require(initialUsdt >= usdtAmount, "Whale should have enough USDT");
+        assertGe(IERC20(USDT).balanceOf(user), usdtAmount, "Whale should have enough USDT");
 
-        IERC20(usdt).forceApprove(address(router), usdtAmount);
-        uint256 ghoReceived = router.swapToGHO(usdt, usdtAmount, 0);
-        require(ghoReceived > 0, "Should receive GHO");
+        SafeERC20.forceApprove(IERC20(USDT), address(router), usdtAmount);
+        uint256 ghoReceived = router.swapToGHO(USDT, usdtAmount, 0);
+
+        assertGt(ghoReceived, 0, "Should receive GHO");
+
+        vm.stopPrank();
+    }
+}
+
+contract SwapFromGHOTest is GSMRouterTest {
+    function test_swapGHOToUSDC() public {
+        uint256 ghoAmount = 100 ether;
+        address user = GHO_WHALE;
+
+        vm.startPrank(user);
+
+        assertGe(IERC20(GHO).balanceOf(user), ghoAmount, "Whale should have enough GHO");
+
+        IERC20(GHO).approve(address(router), ghoAmount);
+        uint256 usdcReceived = router.swapFromGHO(USDC, ghoAmount, 0);
+
+        assertGt(usdcReceived, 0, "Should receive USDC");
 
         vm.stopPrank();
     }
 
-    function testSwapGHOToUSDC() public {
+    function test_swapGHOToUSDT() public {
         uint256 ghoAmount = 100 ether;
         address user = GHO_WHALE;
-        address gho = router.GHO();
-        address usdc = router.USDC();
 
         vm.startPrank(user);
 
-        uint256 initialGho = IERC20(gho).balanceOf(user);
-        require(initialGho >= ghoAmount, "Whale should have enough GHO");
+        assertGe(IERC20(GHO).balanceOf(user), ghoAmount, "Whale should have enough GHO");
 
-        IERC20(gho).approve(address(router), ghoAmount);
-        uint256 usdcReceived = router.swapFromGHO(usdc, ghoAmount, 0);
-        require(usdcReceived > 0, "Should receive USDC");
+        IERC20(GHO).approve(address(router), ghoAmount);
+        uint256 usdtReceived = router.swapFromGHO(USDT, ghoAmount, 0);
 
-        vm.stopPrank();
-    }
-
-    function testSwapGHOToUSDT() public {
-        uint256 ghoAmount = 100 ether;
-        address user = GHO_WHALE;
-        address gho = router.GHO();
-        address usdt = router.USDT();
-
-        vm.startPrank(user);
-
-        uint256 initialGho = IERC20(gho).balanceOf(user);
-        require(initialGho >= ghoAmount, "Whale should have enough GHO");
-
-        IERC20(gho).approve(address(router), ghoAmount);
-        uint256 usdtReceived = router.swapFromGHO(usdt, ghoAmount, 0);
-        require(usdtReceived > 0, "Should receive USDT");
+        assertGt(usdtReceived, 0, "Should receive USDT");
 
         vm.stopPrank();
     }

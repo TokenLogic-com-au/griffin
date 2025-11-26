@@ -32,7 +32,11 @@ contract GSMRouterTest is Test {
         0x535b2f7C20B9C83d70e519cf9991578eF9816B7B; // Gsm4626 USDT
 
     function setUp() public {
-        router = new GSMRouter(address(this), GSM_USDC, GSM_USDT);
+        router = new GSMRouter(address(this), GHO);
+
+        // Configure token mappings
+        router.setTokenConfig(USDC, STATA_USDC, GSM_USDC);
+        router.setTokenConfig(USDT, STATA_USDT, GSM_USDT);
     }
 
     function test_constructor() public view {
@@ -47,25 +51,41 @@ contract GSMRouterTest is Test {
     }
 }
 
-contract SetTokenToGsmMappingTest is GSMRouterTest {
-    function test_setGsmUSDC() public {
-        assertEq(router.tokenToGsm(USDC, STATA_USDC), address(0));
-
+contract SetTokenConfigTest is GSMRouterTest {
+    function test_setNewTokenConfig() public {
+        address newToken = makeAddr("newToken");
+        address newStataToken = makeAddr("newStataToken");
         address newGsm = makeAddr("newGsm");
 
-        router.setTokenToGsmMapping(USDC, STATA_USDC, newGsm);
+        // Verify config doesn't exist yet
+        (address stataToken, address gsm) = router.tokenConfig(newToken);
+        assertEq(stataToken, address(0));
+        assertEq(gsm, address(0));
 
-        assertEq(router.tokenToGsm(USDC, STATA_USDC), newGsm);
+        router.setTokenConfig(newToken, newStataToken, newGsm);
+
+        // Verify config is set
+        (stataToken, gsm) = router.tokenConfig(newToken);
+        assertEq(stataToken, newStataToken);
+        assertEq(gsm, newGsm);
     }
 
-    function test_setGsmUSDT() public {
-        assertEq(router.tokenToGsm(USDT, STATA_USDT), address(0));
-
+    function test_updateExistingConfig() public {
         address newGsm = makeAddr("newGsm");
+        address newStataToken = makeAddr("newStataToken");
 
-        router.setTokenToGsmMapping(USDT, STATA_USDT, newGsm);
+        // Verify current config
+        (address stataToken, address gsm) = router.tokenConfig(USDC);
+        assertEq(stataToken, STATA_USDC);
+        assertEq(gsm, GSM_USDC);
 
-        assertEq(router.tokenToGsm(USDT, STATA_USDT), newGsm);
+        // Update to new values
+        router.setTokenConfig(USDC, newStataToken, newGsm);
+
+        // Verify config is updated
+        (stataToken, gsm) = router.tokenConfig(USDC);
+        assertEq(stataToken, newStataToken);
+        assertEq(gsm, newGsm);
     }
 
     function test_reverts_onlyOwner() public {
@@ -79,7 +99,22 @@ contract SetTokenToGsmMappingTest is GSMRouterTest {
                 notOwner
             )
         );
-        router.setTokenToGsmMapping(USDT, STATA_USDT, newGsm);
+        router.setTokenConfig(USDT, STATA_USDT, newGsm);
+    }
+
+    function test_reverts_zeroToken() public {
+        vm.expectRevert(IGSMRouter.ZeroAddress.selector);
+        router.setTokenConfig(address(0), STATA_USDC, GSM_USDC);
+    }
+
+    function test_reverts_zeroStataToken() public {
+        vm.expectRevert(IGSMRouter.ZeroAddress.selector);
+        router.setTokenConfig(USDC, address(0), GSM_USDC);
+    }
+
+    function test_reverts_zeroGsm() public {
+        vm.expectRevert(IGSMRouter.ZeroAddress.selector);
+        router.setTokenConfig(USDC, STATA_USDC, address(0));
     }
 }
 
@@ -124,7 +159,7 @@ contract SwapPreviewSwapFromGHOTest is GSMRouterTest {
     function testFuzz_swapToGHOAmount(uint256 amount) public {
         // Bound amount between 1 and 1 million (in token units with 6 decimals)
         amount = bound(amount, 1, 1_000_000 * 1e6);
-        address token = router.USDC();
+        address token = USDC;
 
         // Should revert with zero amount
         vm.expectRevert(IGSMRouter.InvalidAmount.selector);
@@ -142,7 +177,7 @@ contract SwapPreviewSwapFromGHOTest is GSMRouterTest {
     function testFuzz_swapFromGHOAmount(uint256 ghoAmount) public {
         // Bound amount between 1 and 1 million GHO (18 decimals)
         ghoAmount = bound(ghoAmount, 1, 1_000_000 * 1e18);
-        address token = router.USDC();
+        address token = USDC;
 
         // Should revert with zero amount
         vm.expectRevert(IGSMRouter.InvalidAmount.selector);
@@ -162,7 +197,7 @@ contract SwapPreviewSwapFromGHOTest is GSMRouterTest {
     ) public view {
         // Bound amount to reasonable values
         amount = bound(amount, 1, 1_000_000 * 1e6);
-        address token = useUSDC ? router.USDC() : router.USDT();
+        address token = useUSDC ? USDC : USDT;
 
         // Preview requires actual GSM contracts to work
         // In unit tests without fork, this will revert
@@ -185,7 +220,7 @@ contract SwapPreviewSwapFromGHOTest is GSMRouterTest {
     ) public view {
         // Bound amount to reasonable values
         ghoAmount = bound(ghoAmount, 1, 1_000_000 * 1e18);
-        address token = useUSDC ? router.USDC() : router.USDT();
+        address token = useUSDC ? USDC : USDT;
 
         // Preview requires actual GSM contracts to work
         // In unit tests without fork, this will revert

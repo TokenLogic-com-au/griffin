@@ -42,16 +42,11 @@ contract DeployGSMRouter is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        new GSMRouter(
-            OWNER,
-            GSM_USDC,
-            GSM_USDT,
-            USDC,
-            USDT,
-            GHO,
-            STATA_USDC,
-            STATA_USDT
-        );
+        router = new GSMRouter(OWNER, GHO);
+
+        // Configure token mappings
+        router.setTokenConfig(USDC, STATA_USDC, GSM_USDC);
+        router.setTokenConfig(USDT, STATA_USDT, GSM_USDT);
 
         vm.stopBroadcast();
     }
