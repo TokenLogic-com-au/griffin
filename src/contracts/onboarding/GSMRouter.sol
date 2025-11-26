@@ -36,11 +36,7 @@ contract GSMRouter is Ownable, IGSMRouter {
     }
 
     /// @inheritdoc IGSMRouter
-    function swapToGHO(
-        address token,
-        uint256 amount,
-        uint256 minGHOAmount
-    ) external returns (uint256) {
+    function swapToGHO(address token, uint256 amount, uint256 minGHOAmount) external returns (uint256) {
         require(amount > 0, InvalidAmount());
 
         TokenConfig memory config = tokenConfig[token];
@@ -51,10 +47,7 @@ contract GSMRouter is Ownable, IGSMRouter {
 
         // Step 1: Deposit underlying asset to stataToken
         IERC20(token).forceApprove(config.stataToken, amount);
-        uint256 stataAmount = IStaticAToken(config.stataToken).deposit(
-            amount,
-            address(this)
-        );
+        uint256 stataAmount = IStaticAToken(config.stataToken).deposit(amount, address(this));
 
         // Step 2: Swap stataToken for GHO via GSM
         IERC20(config.stataToken).forceApprove(config.gsm, stataAmount);
@@ -70,11 +63,7 @@ contract GSMRouter is Ownable, IGSMRouter {
     }
 
     /// @inheritdoc IGSMRouter
-    function swapFromGHO(
-        address token,
-        uint256 ghoAmount,
-        uint256 minOutputAmount
-    ) external returns (uint256) {
+    function swapFromGHO(address token, uint256 ghoAmount, uint256 minOutputAmount) external returns (uint256) {
         require(ghoAmount > 0, InvalidAmount());
 
         TokenConfig memory config = tokenConfig[token];
@@ -84,23 +73,14 @@ contract GSMRouter is Ownable, IGSMRouter {
         IERC20(GHO).safeTransferFrom(msg.sender, address(this), ghoAmount);
 
         // Step 1: Calculate exact stataToken amount to buy with GHO
-        (uint256 stataAmountToBuy, , , ) = IGSM(config.gsm).getAssetAmountForBuyAsset(
-            ghoAmount
-        );
+        (uint256 stataAmountToBuy,,,) = IGSM(config.gsm).getAssetAmountForBuyAsset(ghoAmount);
 
         // Step 2: Swap GHO for stataToken via GSM
         IERC20(GHO).forceApprove(config.gsm, ghoAmount);
-        (uint256 stataAmount, ) = IGSM(config.gsm).buyAsset(
-            stataAmountToBuy,
-            address(this)
-        );
+        (uint256 stataAmount,) = IGSM(config.gsm).buyAsset(stataAmountToBuy, address(this));
 
         // Step 3: Redeem stataToken for underlying asset
-        uint256 outputAmount = IStaticAToken(config.stataToken).redeem(
-            stataAmount,
-            msg.sender,
-            address(this)
-        );
+        uint256 outputAmount = IStaticAToken(config.stataToken).redeem(stataAmount, msg.sender, address(this));
 
         require(outputAmount >= minOutputAmount, SlippageExceeded());
 
@@ -110,11 +90,7 @@ contract GSMRouter is Ownable, IGSMRouter {
     }
 
     /// @inheritdoc IGSMRouter
-    function setTokenConfig(
-        address token,
-        address stataToken,
-        address gsm
-    ) external onlyOwner {
+    function setTokenConfig(address token, address stataToken, address gsm) external onlyOwner {
         require(token != address(0), ZeroAddress());
         require(stataToken != address(0), ZeroAddress());
         require(gsm != address(0), ZeroAddress());
@@ -125,10 +101,7 @@ contract GSMRouter is Ownable, IGSMRouter {
     }
 
     /// @inheritdoc IGSMRouter
-    function previewSwapToGHO(
-        address token,
-        uint256 amount
-    ) external view returns (uint256, uint256) {
+    function previewSwapToGHO(address token, uint256 amount) external view returns (uint256, uint256) {
         require(amount > 0, InvalidAmount());
 
         TokenConfig memory config = tokenConfig[token];
@@ -139,28 +112,21 @@ contract GSMRouter is Ownable, IGSMRouter {
 
         // This is a simplified preview:
         // Actual amount may vary slightly due to interest accrual in Aave
-        (, uint256 ghoAmount, , uint256 fee) = IGSM(config.gsm)
-            .getGhoAmountForSellAsset(sharesAmount);
+        (, uint256 ghoAmount,, uint256 fee) = IGSM(config.gsm).getGhoAmountForSellAsset(sharesAmount);
         return (ghoAmount, fee);
     }
 
     /// @inheritdoc IGSMRouter
-    function previewSwapFromGHO(
-        address token,
-        uint256 ghoAmount
-    ) external view returns (uint256, uint256) {
+    function previewSwapFromGHO(address token, uint256 ghoAmount) external view returns (uint256, uint256) {
         require(ghoAmount > 0, InvalidAmount());
 
         TokenConfig memory config = tokenConfig[token];
         require(config.stataToken != address(0), InvalidToken());
         require(config.gsm != address(0), InvalidGsm());
 
-        (uint256 assetAmount, , , uint256 fee) = IGSM(config.gsm)
-            .getAssetAmountForBuyAsset(ghoAmount);
+        (uint256 assetAmount,,, uint256 fee) = IGSM(config.gsm).getAssetAmountForBuyAsset(ghoAmount);
 
-        uint256 outputAmount = IStaticAToken(config.stataToken).previewRedeem(
-            assetAmount
-        );
+        uint256 outputAmount = IStaticAToken(config.stataToken).previewRedeem(assetAmount);
 
         return (outputAmount, fee);
     }

@@ -34,12 +34,7 @@ interface IGSMRouter {
      * @param inputAmount The amount of input tokens sold
      * @param ghoAmount The amount of GHO received
      */
-    event SwapToGHO(
-        address indexed user,
-        address indexed inputToken,
-        uint256 inputAmount,
-        uint256 ghoAmount
-    );
+    event SwapToGHO(address indexed user, address indexed inputToken, uint256 inputAmount, uint256 ghoAmount);
 
     /**
      * @notice Emitted when a swap from GHO is completed
@@ -48,12 +43,7 @@ interface IGSMRouter {
      * @param ghoAmount The amount of GHO sold
      * @param outputAmount The amount of output tokens received
      */
-    event SwapFromGHO(
-        address indexed user,
-        address indexed outputToken,
-        uint256 ghoAmount,
-        uint256 outputAmount
-    );
+    event SwapFromGHO(address indexed user, address indexed outputToken, uint256 ghoAmount, uint256 outputAmount);
 
     /**
      * @notice Emitted when a token is mapped to GSM
@@ -61,11 +51,7 @@ interface IGSMRouter {
      * @param stataToken The address of the stata token
      * @param gsm The address of the GSM
      */
-    event TokenConfigSet(
-        address indexed token,
-        address indexed stataToken,
-        address indexed gsm
-    );
+    event TokenConfigSet(address indexed token, address indexed stataToken, address indexed gsm);
 
     /**
      * Updates a token to GSM configuration
@@ -73,11 +59,7 @@ interface IGSMRouter {
      * @param stataToken Address of the stata token
      * @param gsm Address of the GSM
      */
-    function setTokenConfig(
-        address token,
-        address stataToken,
-        address gsm
-    ) external;
+    function setTokenConfig(address token, address stataToken, address gsm) external;
 
     /**
      * @notice Swap underlying token to GHO
@@ -86,11 +68,7 @@ interface IGSMRouter {
      * @param minGHOAmount Minimum amount of GHO to receive (slippage protection)
      * @return Amount of GHO received
      */
-    function swapToGHO(
-        address token,
-        uint256 amount,
-        uint256 minGHOAmount
-    ) external returns (uint256);
+    function swapToGHO(address token, uint256 amount, uint256 minGHOAmount) external returns (uint256);
 
     /**
      * @notice Swap GHO back to underlying token
@@ -99,11 +77,7 @@ interface IGSMRouter {
      * @param minOutputAmount Minimum amount of output token to receive (slippage protection)
      * @return Amount of output token received
      */
-    function swapFromGHO(
-        address token,
-        uint256 ghoAmount,
-        uint256 minOutputAmount
-    ) external returns (uint256);
+    function swapFromGHO(address token, uint256 ghoAmount, uint256 minOutputAmount) external returns (uint256);
 
     /**
      * @notice Preview the amount of GHO received for a given input amount
@@ -113,10 +87,7 @@ interface IGSMRouter {
      * @return ghoAmount Expected amount of GHO to receive
      * @return fee Fee amount charged by the GSM
      */
-    function previewSwapToGHO(
-        address token,
-        uint256 amount
-    ) external view returns (uint256 ghoAmount, uint256 fee);
+    function previewSwapToGHO(address token, uint256 amount) external view returns (uint256 ghoAmount, uint256 fee);
 
     /**
      * @notice Preview the amount of output token received for a given GHO amount
@@ -126,10 +97,10 @@ interface IGSMRouter {
      * @return assetAmount Expected amount of output token to receive
      * @return fee Fee amount charged by the GSM
      */
-    function previewSwapFromGHO(
-        address token,
-        uint256 ghoAmount
-    ) external view returns (uint256 assetAmount, uint256 fee);
+    function previewSwapFromGHO(address token, uint256 ghoAmount)
+        external
+        view
+        returns (uint256 assetAmount, uint256 fee);
 
     /**
      * @notice Returns address of the GHO token on the deployed network
@@ -143,7 +114,5 @@ interface IGSMRouter {
      * @return stataToken Address of the stataToken
      * @return gsm Address of the GSM
      */
-    function tokenConfig(
-        address token
-    ) external view returns (address stataToken, address gsm);
+    function tokenConfig(address token) external view returns (address stataToken, address gsm);
 }

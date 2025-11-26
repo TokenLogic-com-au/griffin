@@ -20,20 +20,16 @@ contract DeployGSMRouter is Script {
     address public constant GHO = 0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f;
 
     // https://etherscan.io/address/0xD4fa2D31b7968E448877f69A96DE69f5de8cD23E
-    address public constant STATA_USDC =
-        0xD4fa2D31b7968E448877f69A96DE69f5de8cD23E;
+    address public constant STATA_USDC = 0xD4fa2D31b7968E448877f69A96DE69f5de8cD23E;
 
     // https://etherscan.io/address/0x7Bc3485026Ac48b6cf9BaF0A377477Fff5703Af8
-    address public constant STATA_USDT =
-        0x7Bc3485026Ac48b6cf9BaF0A377477Fff5703Af8;
+    address public constant STATA_USDT = 0x7Bc3485026Ac48b6cf9BaF0A377477Fff5703Af8;
 
     // https://etherscan.io/address/0xFeeb6FE430B7523fEF2a38327241eE7153779535
-    address internal constant GSM_USDC =
-        0xFeeb6FE430B7523fEF2a38327241eE7153779535;
+    address internal constant GSM_USDC = 0xFeeb6FE430B7523fEF2a38327241eE7153779535;
 
     // https://etherscan.io/address/0x535b2f7C20B9C83d70e519cf9991578eF9816B7B
-    address internal constant GSM_USDT =
-        0x535b2f7C20B9C83d70e519cf9991578eF9816B7B;
+    address internal constant GSM_USDT = 0x535b2f7C20B9C83d70e519cf9991578eF9816B7B;
 
     address internal constant OWNER = address(0);
 
