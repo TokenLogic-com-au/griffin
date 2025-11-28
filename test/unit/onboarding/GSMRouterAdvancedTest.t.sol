@@ -14,6 +14,85 @@ import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockGSMWithFees} from "test/mocks/MockGSMWithFees.sol";
 import {MockStaticATokenWithRate} from "test/mocks/MockStaticATokenWithRate.sol";
 
+/// @notice GSM mock that only fills a percentage of the requested amount (simulates partial fills)
+contract MockGSMPartialFill is IGSM {
+    address public asset;
+    address public gho;
+    uint256 public fillBps; // e.g., 5000 = 50% fill
+
+    constructor(address _asset, address _gho, uint256 _fillBps) {
+        asset = _asset;
+        gho = _gho;
+        fillBps = _fillBps;
+    }
+
+    function setFillBps(uint256 _fillBps) external {
+        fillBps = _fillBps;
+    }
+
+    function buyAsset(uint256 minAmount, address receiver) external override returns (uint256, uint256) {
+        uint256 assetOut = (minAmount * fillBps) / 10000;
+        IERC20(asset).transfer(receiver, assetOut);
+        IERC20(gho).transferFrom(msg.sender, address(this), assetOut);
+        return (assetOut, assetOut);
+    }
+
+    function sellAsset(uint256 maxAmount, address receiver) external override returns (uint256, uint256) {
+        uint256 sold = (maxAmount * fillBps) / 10000;
+        IERC20(gho).transfer(receiver, sold);
+        IERC20(asset).transferFrom(msg.sender, address(this), sold);
+        return (sold, sold);
+    }
+
+    function getGhoAmountForBuyAsset(uint256 minAssetAmount)
+        external
+        view
+        override
+        returns (uint256, uint256, uint256, uint256)
+    {
+        uint256 ghoNeeded = (minAssetAmount * fillBps) / 10000;
+        return (ghoNeeded, minAssetAmount, ghoNeeded, minAssetAmount - ghoNeeded);
+    }
+
+    function getGhoAmountForSellAsset(uint256 maxAssetAmount)
+        external
+        view
+        override
+        returns (uint256, uint256, uint256, uint256)
+    {
+        uint256 sold = (maxAssetAmount * fillBps) / 10000;
+        return (sold, sold, sold, maxAssetAmount - sold);
+    }
+
+    function getAssetAmountForBuyAsset(uint256 maxGhoAmount)
+        external
+        view
+        override
+        returns (uint256, uint256, uint256, uint256)
+    {
+        // Return full requested amount; buyAsset will partially fill
+        return (maxGhoAmount, maxGhoAmount, maxGhoAmount, 0);
+    }
+
+    function getAssetAmountForSellAsset(uint256 minGhoAmount)
+        external
+        view
+        override
+        returns (uint256, uint256, uint256, uint256)
+    {
+        uint256 assetNeeded = (minGhoAmount * fillBps) / 10000;
+        return (assetNeeded, minGhoAmount, assetNeeded, minGhoAmount - assetNeeded);
+    }
+
+    function getAvailableLiquidity() external pure override returns (uint256) {
+        return type(uint256).max;
+    }
+
+    function canSwap() external pure override returns (bool) {
+        return true;
+    }
+}
+
 // ============================================
 // TEST 1: FEE HANDLING TESTS
 // ============================================
@@ -292,7 +371,7 @@ contract InterestAccrualTest is Test {
     }
 
     function test_interestAccrual_benefitsRedeemer() public {
-        uint256 ghoAmount = 1000 * 1e6;
+        uint256 ghoAmount = 1000 * 1e18;
 
         gho.mint(address(this), ghoAmount);
         gho.approve(address(router), ghoAmount);
@@ -376,11 +455,7 @@ contract ConcurrentUserTest is Test {
         router.setTokenConfig(address(usdc), address(stataUsdc), address(gsmUsdc));
     }
 
-    function testFuzz_multipleUsers_swapToGHO(
-        uint256 amount1,
-        uint256 amount2,
-        uint256 amount3
-    ) public {
+    function testFuzz_multipleUsers_swapToGHO(uint256 amount1, uint256 amount2, uint256 amount3) public {
         amount1 = bound(amount1, 1e6, 1_000_000 * 1e6);
         amount2 = bound(amount2, 1e6, 1_000_000 * 1e6);
         amount3 = bound(amount3, 1e6, 1_000_000 * 1e6);
@@ -425,8 +500,8 @@ contract ConcurrentUserTest is Test {
 
     function test_mixedOperations_concurrent() public {
         // Test concurrent operations from different users
-        uint256 toGhoAmount = 10_000 * 1e6;   // 10k USDC
-        uint256 fromGhoAmount = 5_000 * 1e6;  // 5k GHO (using same scale for mock simplicity)
+        uint256 toGhoAmount = 10_000 * 1e6; // 10k USDC
+        uint256 fromGhoAmount = 5_000 * 1e18; // 5k GHO
 
         address user1 = makeAddr("user1");
         address user2 = makeAddr("user2");
@@ -457,10 +532,7 @@ contract ConcurrentUserTest is Test {
         assertGt(usdc2, 0, "User2 should have received USDC");
     }
 
-    function testFuzz_independentUserSwapsToGHO(
-        uint256 amount1,
-        uint256 amount2
-    ) public {
+    function testFuzz_independentUserSwapsToGHO(uint256 amount1, uint256 amount2) public {
         amount1 = bound(amount1, 1e6, 100_000 * 1e6);
         amount2 = bound(amount2, 1e6, 100_000 * 1e6);
 
@@ -519,6 +591,77 @@ contract ConcurrentUserTest is Test {
 }
 
 // ============================================
+// TEST 7: PARTIAL FILL REFUNDS
+// ============================================
+
+contract PartialFillRefundTest is Test {
+    GSMRouter public router;
+
+    MockERC20 public usdc;
+    MockERC20 public gho;
+    MockStaticATokenWithRate public stataUsdc;
+    MockGSMPartialFill public gsmPartial;
+
+    uint256 constant LIQUIDITY = 100_000_000 * 1e18;
+    uint256 constant FILL_BPS = 5000; // 50% fill
+
+    function setUp() public {
+        usdc = new MockERC20("USDC", "USDC", 6);
+        gho = new MockERC20("GHO", "GHO", 18);
+        stataUsdc = new MockStaticATokenWithRate("stataUSDC", "stataUSDC", 6, address(usdc));
+        gsmPartial = new MockGSMPartialFill(address(stataUsdc), address(gho), FILL_BPS);
+
+        // Fund liquidity so transfers succeed
+        gho.mint(address(gsmPartial), LIQUIDITY);
+        stataUsdc.mint(address(gsmPartial), LIQUIDITY);
+        usdc.mint(address(stataUsdc), LIQUIDITY);
+
+        router = new GSMRouter(address(this), address(gho));
+        router.setTokenConfig(address(usdc), address(stataUsdc), address(gsmPartial));
+    }
+
+    function test_swapToGHO_refundsLeftoverStata() public {
+        uint256 amount = 1_000 * 1e6;
+        uint256 expectedSold = (amount * FILL_BPS) / 10000;
+        uint256 expectedLeftover = amount - expectedSold;
+
+        usdc.mint(address(this), amount);
+        usdc.approve(address(router), amount);
+
+        uint256 ghoReceived = router.swapToGHO(address(usdc), amount, 0);
+
+        // Received only the filled amount in GHO
+        assertEq(ghoReceived, expectedSold, "GHO received should equal filled amount");
+        // Leftover USDC refunded to user via stata redeem
+        assertEq(usdc.balanceOf(address(this)), expectedLeftover, "User should get leftover USDC back");
+        // Router should not retain approvals or balances
+        assertEq(usdc.allowance(address(router), address(stataUsdc)), 0, "USDC allowance cleared");
+        assertEq(stataUsdc.allowance(address(router), address(gsmPartial)), 0, "stataUSDC allowance cleared");
+        assertEq(usdc.balanceOf(address(router)), 0, "Router holds no USDC");
+        assertEq(stataUsdc.balanceOf(address(router)), 0, "Router holds no stataUSDC");
+    }
+
+    function test_swapFromGHO_refundsLeftoverGho() public {
+        uint256 ghoAmount = 1_000 * 1e18;
+        // Router will burn only a portion; output is proportional to burn
+        uint256 expectedBurn = (ghoAmount * FILL_BPS) / 10000;
+        uint256 expectedRefund = ghoAmount - expectedBurn;
+        uint256 expectedUsdcOut = expectedBurn; // Mock is 1:1
+
+        gho.mint(address(this), ghoAmount);
+        gho.approve(address(router), ghoAmount);
+
+        uint256 usdcReceived = router.swapFromGHO(address(usdc), ghoAmount, 0);
+
+        assertEq(usdcReceived, expectedUsdcOut, "USDC out should match burned GHO");
+        assertEq(gho.balanceOf(address(this)), expectedRefund, "User should receive GHO refund");
+        assertEq(gho.allowance(address(router), address(gsmPartial)), 0, "GHO allowance cleared");
+        assertEq(gho.balanceOf(address(router)), 0, "Router holds no GHO");
+        assertEq(usdc.balanceOf(address(router)), 0, "Router holds no USDC");
+    }
+}
+
+// ============================================
 // TEST 5: INVARIANT TESTS
 // ============================================
 
@@ -530,12 +673,7 @@ contract InvariantHandler is Test {
 
     address[] public actors;
 
-    constructor(
-        GSMRouter _router,
-        MockERC20 _usdc,
-        MockERC20 _gho,
-        MockStaticATokenWithRate _stataUsdc
-    ) {
+    constructor(GSMRouter _router, MockERC20 _usdc, MockERC20 _gho, MockStaticATokenWithRate _stataUsdc) {
         router = _router;
         usdc = _usdc;
         gho = _gho;
@@ -556,8 +694,7 @@ contract InvariantHandler is Test {
         vm.startPrank(actor);
         usdc.approve(address(router), amount);
 
-        try router.swapToGHO(address(usdc), amount, 0) {}
-        catch {}
+        try router.swapToGHO(address(usdc), amount, 0) {} catch {}
 
         vm.stopPrank();
     }
@@ -571,8 +708,7 @@ contract InvariantHandler is Test {
         vm.startPrank(actor);
         gho.approve(address(router), amount);
 
-        try router.swapFromGHO(address(usdc), amount, 0) {}
-        catch {}
+        try router.swapFromGHO(address(usdc), amount, 0) {} catch {}
 
         vm.stopPrank();
     }
