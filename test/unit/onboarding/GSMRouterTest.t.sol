@@ -134,9 +134,6 @@ contract MockERC20 is IERC20 {
     }
 
     contract MockStaticAToken is IStaticAToken {
-        event Transfer(address indexed from, address indexed to, uint256 value);
-        event Approval(address indexed owner, address indexed spender, uint256 value);
-
         string public name;
         string public symbol;
         uint8 public decimals;

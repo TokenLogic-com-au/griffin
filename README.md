@@ -173,7 +173,6 @@ griffin/
 │       ├── IERC20.sol
 │       ├── IERC4626.sol
 │       ├── IGSM.sol
-│       ├── IPool.sol
 │       └── IStaticAToken.sol
 ├── test/
 │   ├── GSMRouter.t.sol         # Integration tests
