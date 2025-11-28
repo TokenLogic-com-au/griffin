@@ -7,6 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {GSMRouter} from "src/contracts/onboarding/GSMRouter.sol";
+import {IGSMRouter} from "src/interfaces/onboarding/IGSMRouter.sol";
 
 /**
  * @title GSMRouterTest
@@ -85,6 +86,29 @@ contract SwapToGHOTest is GSMRouterTest {
 
         vm.stopPrank();
     }
+
+    function test_reverts_swapToGHO_zeroAmount() public {
+        vm.startPrank(USER);
+        vm.expectRevert(IGSMRouter.InvalidAmount.selector);
+        router.swapToGHO(USDC, 0, 0);
+        vm.stopPrank();
+    }
+
+    function test_reverts_swapToGHO_slippageExceeded() public {
+        uint256 usdcAmount = 1000 * 1e6; // 1000 USDC
+
+        deal(USDC, USER, usdcAmount);
+
+        vm.startPrank(USER);
+
+        IERC20(USDC).approve(address(router), usdcAmount);
+
+        // Set unreasonably high minGHOAmount to trigger slippage
+        vm.expectRevert(IGSMRouter.SlippageExceeded.selector);
+        router.swapToGHO(USDC, usdcAmount, type(uint256).max);
+
+        vm.stopPrank();
+    }
 }
 
 contract SwapFromGHOTest is GSMRouterTest {
@@ -114,6 +138,29 @@ contract SwapFromGHOTest is GSMRouterTest {
         uint256 usdtReceived = router.swapFromGHO(USDT, ghoAmount, 0);
 
         assertGt(usdtReceived, 0, "Should receive USDT");
+
+        vm.stopPrank();
+    }
+
+    function test_reverts_swapFromGHO_zeroAmount() public {
+        vm.startPrank(USER);
+        vm.expectRevert(IGSMRouter.InvalidAmount.selector);
+        router.swapFromGHO(USDC, 0, 0);
+        vm.stopPrank();
+    }
+
+    function test_reverts_swapFromGHO_slippageExceeded() public {
+        uint256 ghoAmount = 100 ether;
+
+        deal(GHO, USER, ghoAmount);
+
+        vm.startPrank(USER);
+
+        IERC20(GHO).approve(address(router), ghoAmount);
+
+        // Set unreasonably high minOutputAmount to trigger slippage
+        vm.expectRevert(IGSMRouter.SlippageExceeded.selector);
+        router.swapFromGHO(USDC, ghoAmount, type(uint256).max);
 
         vm.stopPrank();
     }
