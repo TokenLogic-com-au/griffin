@@ -1,18 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {IGSM} from "src/interfaces/IGSM.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import {MockGSMBase} from "test/mocks/MockGSMBase.sol";
+
 /// @notice GSM mock with configurable fees (basis points)
-contract MockGSMWithFees is IGSM {
-    address public asset;
-    address public gho;
+contract MockGSMWithFees is MockGSMBase {
     uint256 public feeBps; // Fee in basis points (100 = 1%)
 
-    constructor(address _asset, address _gho, uint256 _feeBps) {
-        asset = _asset;
-        gho = _gho;
+    constructor(address _asset, address _gho, uint256 _feeBps) MockGSMBase(_asset, _gho) {
         feeBps = _feeBps;
     }
 
@@ -89,11 +86,11 @@ contract MockGSMWithFees is IGSM {
         return (assetNeeded, minGhoAmount, assetNeeded, fee);
     }
 
-    function getAvailableLiquidity() external pure override returns (uint256) {
+    function getAvailableLiquidity() external view override returns (uint256) {
         return type(uint256).max;
     }
 
-    function canSwap() external pure override returns (bool) {
-        return true;
+    function canSwap() external view override returns (bool) {
+        return !frozen;
     }
 }

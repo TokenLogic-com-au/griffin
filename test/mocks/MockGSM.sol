@@ -1,17 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {IGSM} from "src/interfaces/IGSM.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract MockGSM is IGSM {
-    address public asset;
-    address public gho;
+import {MockGSMBase} from "test/mocks/MockGSMBase.sol";
 
-    constructor(address _asset, address _gho) {
-        asset = _asset;
-        gho = _gho;
-    }
+contract MockGSM is MockGSMBase {
+    constructor(address _asset, address _gho) MockGSMBase(_asset, _gho) {}
 
     function buyAsset(uint256 minAmount, address receiver) external override returns (uint256, uint256) {
         uint256 amount = minAmount;

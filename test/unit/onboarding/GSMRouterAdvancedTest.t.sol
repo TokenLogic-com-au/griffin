@@ -13,16 +13,13 @@ import {IStaticAToken} from "src/interfaces/IStaticAToken.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockGSMWithFees} from "test/mocks/MockGSMWithFees.sol";
 import {MockStaticATokenWithRate} from "test/mocks/MockStaticATokenWithRate.sol";
+import {MockGSMBase} from "test/mocks/MockGSMBase.sol";
 
 /// @notice GSM mock that only fills a percentage of the requested amount (simulates partial fills)
-contract MockGSMPartialFill is IGSM {
-    address public asset;
-    address public gho;
+contract MockGSMPartialFill is MockGSMBase {
     uint256 public fillBps; // e.g., 5000 = 50% fill
 
-    constructor(address _asset, address _gho, uint256 _fillBps) {
-        asset = _asset;
-        gho = _gho;
+    constructor(address _asset, address _gho, uint256 _fillBps) MockGSMBase(_asset, _gho) {
         fillBps = _fillBps;
     }
 
@@ -84,12 +81,12 @@ contract MockGSMPartialFill is IGSM {
         return (assetNeeded, minGhoAmount, assetNeeded, minGhoAmount - assetNeeded);
     }
 
-    function getAvailableLiquidity() external pure override returns (uint256) {
+    function getAvailableLiquidity() external view override returns (uint256) {
         return type(uint256).max;
     }
 
-    function canSwap() external pure override returns (bool) {
-        return true;
+    function canSwap() external view override returns (bool) {
+        return !frozen;
     }
 }
 
