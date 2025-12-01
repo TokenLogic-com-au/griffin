@@ -29,17 +29,9 @@ abstract contract MockGSMBase is IGSM {
     }
 
     // --- Core swap hooks to be implemented by children ---
-    function buyAsset(uint256 minAmount, address receiver)
-        external
-        virtual
-        override
-        returns (uint256, uint256);
+    function buyAsset(uint256 minAmount, address receiver) external virtual override returns (uint256, uint256);
 
-    function sellAsset(uint256 maxAmount, address receiver)
-        external
-        virtual
-        override
-        returns (uint256, uint256);
+    function sellAsset(uint256 maxAmount, address receiver) external virtual override returns (uint256, uint256);
 
     function getGhoAmountForBuyAsset(uint256 minAssetAmount)
         external
@@ -94,24 +86,20 @@ abstract contract MockGSMBase is IGSM {
         return _nonces[user];
     }
 
-    function buyAssetWithSig(
-        address originator,
-        uint256 minAmount,
-        address receiver,
-        uint256,
-        bytes calldata
-    ) external override returns (uint256, uint256) {
+    function buyAssetWithSig(address originator, uint256 minAmount, address receiver, uint256, bytes calldata)
+        external
+        override
+        returns (uint256, uint256)
+    {
         _nonces[originator] += 1;
         return this.buyAsset(minAmount, receiver);
     }
 
-    function sellAssetWithSig(
-        address originator,
-        uint256 maxAmount,
-        address receiver,
-        uint256,
-        bytes calldata
-    ) external override returns (uint256, uint256) {
+    function sellAssetWithSig(address originator, uint256 maxAmount, address receiver, uint256, bytes calldata)
+        external
+        override
+        returns (uint256, uint256)
+    {
         _nonces[originator] += 1;
         return this.sellAsset(maxAmount, receiver);
     }
