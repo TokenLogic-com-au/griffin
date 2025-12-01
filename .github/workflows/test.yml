@@ -40,7 +40,7 @@ jobs:
 
       - name: Run Forge tests
         env:
-          ETH_RPC_URL: ${{ secrets.ETH_RPC_URL }}
+          RPC_URL_MAINNET: ${{ secrets.RPC_URL_MAINNET }}
         run: |
           forge test -vvv
         id: test
