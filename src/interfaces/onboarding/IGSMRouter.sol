@@ -115,4 +115,12 @@ interface IGSMRouter {
      * @return gsm Address of the GSM
      */
     function tokenConfig(address token) external view returns (address stataToken, address gsm);
+
+    /**
+     * @notice Rescue ERC20 token from the contract
+     * @param token Address of the token to rescue
+     * @param to Address to send the tokens to
+     * @param amount Amount of tokens to rescue
+     */
+    function rescueToken(address token, address to, uint256 amount) external;
 }

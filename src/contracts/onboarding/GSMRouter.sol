@@ -141,4 +141,9 @@ contract GSMRouter is Ownable, IGSMRouter {
 
         return (outputAmount, fee);
     }
+
+    /// @inheritdoc IGSMRouter
+    function rescueToken(address token, address to, uint256 amount) external onlyOwner {
+        IERC20(token).safeTransfer(to, amount);
+    }
 }

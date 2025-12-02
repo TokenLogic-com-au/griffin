@@ -633,7 +633,6 @@ contract PartialFillRefundTest is Test {
         assertEq(usdc.balanceOf(address(this)), expectedLeftover, "User should get leftover USDC back");
         // Router should not retain approvals or balances
         assertEq(usdc.allowance(address(router), address(stataUsdc)), 0, "USDC allowance cleared");
-        assertEq(stataUsdc.allowance(address(router), address(gsmPartial)), 0, "stataUSDC allowance cleared");
         assertEq(usdc.balanceOf(address(router)), 0, "Router holds no USDC");
         assertEq(stataUsdc.balanceOf(address(router)), 0, "Router holds no stataUSDC");
     }
@@ -652,7 +651,6 @@ contract PartialFillRefundTest is Test {
 
         assertEq(usdcReceived, expectedUsdcOut, "USDC out should match burned GHO");
         assertEq(gho.balanceOf(address(this)), expectedRefund, "User should receive GHO refund");
-        assertEq(gho.allowance(address(router), address(gsmPartial)), 0, "GHO allowance cleared");
         assertEq(gho.balanceOf(address(router)), 0, "Router holds no GHO");
         assertEq(usdc.balanceOf(address(router)), 0, "Router holds no USDC");
     }

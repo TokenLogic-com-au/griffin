@@ -388,3 +388,31 @@ contract PreviewSwapFromGHOTest is GSMRouterTest {
         assertEq(fee, 0, "Fee should be 0 in mock");
     }
 }
+
+contract RescueTokenTest is GSMRouterTest {
+    address randomToken = address(new MockERC20("RAND", "RAND", 6));
+    uint256 amount = 100 * 1e6;
+
+    function test_rescueToken_success() public {
+        // Send tokens to router
+        MockERC20(randomToken).mint(address(router), amount);
+        assertEq(MockERC20(randomToken).balanceOf(address(router)), amount);
+
+        // Rescue tokens
+        address recipient = makeAddr("recipient");
+        router.rescueToken(randomToken, recipient, amount);
+
+        // Verify
+        assertEq(MockERC20(randomToken).balanceOf(address(router)), 0);
+        assertEq(MockERC20(randomToken).balanceOf(recipient), amount);
+    }
+
+    function test_rescueToken_reverts_notOwner() public {
+        address notOwner = makeAddr("notOwner");
+        address recipient = makeAddr("recipient");
+
+        vm.prank(notOwner);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, notOwner));
+        router.rescueToken(randomToken, recipient, amount);
+    }
+}
