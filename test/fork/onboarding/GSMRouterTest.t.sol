@@ -164,4 +164,23 @@ contract SwapFromGHOTest is GSMRouterTest {
 
         vm.stopPrank();
     }
+
+    function test_previewSwapToGHO() public view {
+        uint256 usdcAmount = 1000 * 1e6; // 1000 USDC
+
+        (uint256 ghoAmount, uint256 fee) = router.previewSwapToGHO(USDC, usdcAmount);
+
+        assertGt(ghoAmount, 0, "Should preview GHO amount");
+        // Fee might be zero depending on GSM config, so we just check it doesn't revert
+        assertGe(fee, 0);
+    }
+
+    function test_previewSwapFromGHO() public view {
+        uint256 ghoAmount = 1000 * 1e18; // 1000 GHO
+
+        (uint256 outputAmount, uint256 fee) = router.previewSwapFromGHO(USDC, ghoAmount);
+
+        assertGt(outputAmount, 0, "Should preview output amount");
+        assertGe(fee, 0);
+    }
 }
