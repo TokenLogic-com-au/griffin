@@ -193,7 +193,7 @@ contract SwapToGHOTest is GSMRouterTest {
         router.swapToGHO(testToken, USDC_AMOUNT, 0);
     }
 
-    function testFuzz_swapToGHO(uint256 amount) public {
+    function test_fuzz_swapToGHO(uint256 amount) public {
         // Bound to reasonable range: 1 wei to 1M tokens (6 decimals)
         amount = bound(amount, 1, 1_000_000 * 1e6);
 
@@ -211,7 +211,7 @@ contract SwapToGHOTest is GSMRouterTest {
         assertEq(MockERC20(USDC).balanceOf(address(this)), usdcBalanceBefore - amount, "USDC balance should decrease");
     }
 
-    function testFuzz_swapToGHO_withSlippage(uint256 amount, uint256 minGhoAmount) public {
+    function test_fuzz_swapToGHO_withSlippage(uint256 amount, uint256 minGhoAmount) public {
         amount = bound(amount, 1, 1_000_000 * 1e6);
         // minGhoAmount should be <= amount for swap to succeed (MockGSM is 1:1)
         minGhoAmount = bound(minGhoAmount, 0, amount);
@@ -267,7 +267,7 @@ contract SwapFromGHOTest is GSMRouterTest {
         router.swapFromGHO(testToken, GHO_AMOUNT, 0);
     }
 
-    function testFuzz_swapFromGHO(uint256 ghoAmount) public {
+    function test_fuzz_swapFromGHO(uint256 ghoAmount) public {
         // Bound to reasonable range: 1 wei to 1M GHO (18 decimals)
         ghoAmount = bound(ghoAmount, 1, 1_000_000 * 1e18);
 
@@ -287,7 +287,7 @@ contract SwapFromGHOTest is GSMRouterTest {
         assertEq(MockERC20(GHO).balanceOf(address(this)), ghoBalanceBefore - ghoAmount, "GHO balance should decrease");
     }
 
-    function testFuzz_swapFromGHO_withSlippage(uint256 ghoAmount, uint256 minOutputAmount) public {
+    function test_fuzz_swapFromGHO_withSlippage(uint256 ghoAmount, uint256 minOutputAmount) public {
         ghoAmount = bound(ghoAmount, 1, 1_000_000 * 1e18);
         // minOutputAmount should be <= ghoAmount for swap to succeed (MockGSM is 1:1)
         minOutputAmount = bound(minOutputAmount, 0, ghoAmount);
@@ -333,7 +333,7 @@ contract PreviewSwapToGHOTest is GSMRouterTest {
         router.previewSwapToGHO(testToken, USDC_AMOUNT);
     }
 
-    function testFuzz_previewSwapToGHO(uint256 amount, bool useUSDT) public view {
+    function test_fuzz_previewSwapToGHO(uint256 amount, bool useUSDT) public view {
         amount = bound(amount, 1, 1_000_000 * 1e6);
         address token = useUSDT ? USDT : USDC;
 
@@ -377,7 +377,7 @@ contract PreviewSwapFromGHOTest is GSMRouterTest {
         router.previewSwapFromGHO(testToken, GHO_AMOUNT);
     }
 
-    function testFuzz_previewSwapFromGHO(uint256 ghoAmount, bool useUSDT) public view {
+    function test_fuzz_previewSwapFromGHO(uint256 ghoAmount, bool useUSDT) public view {
         ghoAmount = bound(ghoAmount, 1, 1_000_000 * 1e18);
         address token = useUSDT ? USDT : USDC;
 
@@ -388,4 +388,3 @@ contract PreviewSwapFromGHOTest is GSMRouterTest {
         assertEq(fee, 0, "Fee should be 0 in mock");
     }
 }
-

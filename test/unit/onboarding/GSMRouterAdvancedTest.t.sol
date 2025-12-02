@@ -167,7 +167,7 @@ contract FeeHandlingTest is Test {
         assertEq(assetAmount, ghoAmount - fee, "Asset amount should be input minus fee");
     }
 
-    function testFuzz_swapToGHO_withVariableFees(uint256 amount, uint256 feeBps) public {
+    function test_fuzz_swapToGHO_withVariableFees(uint256 amount, uint256 feeBps) public {
         amount = bound(amount, 1e6, 1_000_000 * 1e6);
         feeBps = bound(feeBps, 1, 500); // 0.01% to 5%
 
@@ -266,7 +266,7 @@ contract RoundingTest is Test {
         assertApproxEqRel(ghoReceived, expectedShares, 0.01e18, "Should match expected shares calculation");
     }
 
-    function testFuzz_rounding_noValueLeak(uint256 amount) public {
+    function test_fuzz_rounding_noValueLeak(uint256 amount) public {
         amount = bound(amount, 1, 10_000_000 * 1e6);
 
         uint256 initialUsdcBalance = usdc.balanceOf(address(this));
@@ -383,7 +383,7 @@ contract InterestAccrualTest is Test {
         assertGt(usdcReceived, ghoAmount, "Should receive more USDC due to interest");
     }
 
-    function testFuzz_interestAccrual_simulation(uint256 amount, uint256 rateBps) public {
+    function test_fuzz_interestAccrual_simulation(uint256 amount, uint256 rateBps) public {
         amount = bound(amount, 1e6, 10_000_000 * 1e6);
         rateBps = bound(rateBps, 10000, 12000); // 100% to 120% (0-20% interest)
 
@@ -452,7 +452,7 @@ contract ConcurrentUserTest is Test {
         router.setTokenConfig(address(usdc), address(stataUsdc), address(gsmUsdc));
     }
 
-    function testFuzz_multipleUsers_swapToGHO(uint256 amount1, uint256 amount2, uint256 amount3) public {
+    function test_fuzz_multipleUsers_swapToGHO(uint256 amount1, uint256 amount2, uint256 amount3) public {
         amount1 = bound(amount1, 1e6, 1_000_000 * 1e6);
         amount2 = bound(amount2, 1e6, 1_000_000 * 1e6);
         amount3 = bound(amount3, 1e6, 1_000_000 * 1e6);
@@ -529,7 +529,7 @@ contract ConcurrentUserTest is Test {
         assertGt(usdc2, 0, "User2 should have received USDC");
     }
 
-    function testFuzz_independentUserSwapsToGHO(uint256 amount1, uint256 amount2) public {
+    function test_fuzz_independentUserSwapsToGHO(uint256 amount1, uint256 amount2) public {
         amount1 = bound(amount1, 1e6, 100_000 * 1e6);
         amount2 = bound(amount2, 1e6, 100_000 * 1e6);
 
@@ -557,7 +557,7 @@ contract ConcurrentUserTest is Test {
         assertEq(usdc.balanceOf(user2), 0, "User2 spent all USDC");
     }
 
-    function testFuzz_stressTest_manyUsers(uint8 numUsers) public {
+    function test_fuzz_stressTest_manyUsers(uint8 numUsers) public {
         numUsers = uint8(bound(numUsers, 5, 50));
 
         uint256[] memory amounts = new uint256[](numUsers);
@@ -781,7 +781,7 @@ contract SlippageInvariantTest is Test {
     }
 
     /// @notice User output should always be >= minAmount (or revert)
-    function testFuzz_outputAlwaysGteMinAmount(uint256 amount, uint256 minAmount) public {
+    function test_fuzz_outputAlwaysGteMinAmount(uint256 amount, uint256 minAmount) public {
         amount = bound(amount, 1e6, 1_000_000 * 1e6);
 
         usdc.mint(address(this), amount);
