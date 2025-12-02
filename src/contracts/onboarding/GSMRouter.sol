@@ -48,12 +48,10 @@ contract GSMRouter is Ownable, IGSMRouter {
         // Step 1: Deposit underlying asset to stataToken
         IERC20(token).forceApprove(config.stataToken, amount);
         uint256 stataAmount = IStaticAToken(config.stataToken).deposit(amount, address(this));
-        IERC20(token).forceApprove(config.stataToken, 0);
 
         // Step 2: Swap stataToken for GHO via GSM
         IERC20(config.stataToken).forceApprove(config.gsm, stataAmount);
         (uint256 assetSold, uint256 ghoAmount) = IGSM(config.gsm).sellAsset(stataAmount, address(this));
-        IERC20(config.stataToken).forceApprove(config.gsm, 0);
 
         require(ghoAmount >= minGHOAmount, SlippageExceeded());
 
@@ -86,7 +84,6 @@ contract GSMRouter is Ownable, IGSMRouter {
         // Step 2: Swap GHO for stataToken via GSM
         IERC20(GHO).forceApprove(config.gsm, ghoAmount);
         (uint256 stataAmount, uint256 ghoBurned) = IGSM(config.gsm).buyAsset(stataAmountToBuy, address(this));
-        IERC20(GHO).forceApprove(config.gsm, 0);
 
         // Refund any unspent GHO
         if (ghoBurned < ghoAmount) {
