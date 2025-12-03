@@ -80,6 +80,14 @@ interface IGSMRouter {
     function swapFromGHO(address token, uint256 ghoAmount, uint256 minOutputAmount) external returns (uint256);
 
     /**
+     * @notice Rescue ERC20 token from the contract
+     * @param token Address of the token to rescue
+     * @param to Address to send the tokens to
+     * @param amount Amount of tokens to rescue
+     */
+    function rescueToken(address token, address to, uint256 amount) external;
+
+    /**
      * @notice Preview the amount of GHO received for a given input amount
      * @dev This is an estimation and actual results may vary slightly due to interest accrual
      * @param token Underlying token address to swap from
@@ -115,12 +123,4 @@ interface IGSMRouter {
      * @return gsm Address of the GSM
      */
     function tokenConfig(address token) external view returns (address stataToken, address gsm);
-
-    /**
-     * @notice Rescue ERC20 token from the contract
-     * @param token Address of the token to rescue
-     * @param to Address to send the tokens to
-     * @param amount Amount of tokens to rescue
-     */
-    function rescueToken(address token, address to, uint256 amount) external;
 }

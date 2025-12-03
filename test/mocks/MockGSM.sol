@@ -26,15 +26,6 @@ contract MockGSM is MockGSMBase {
         return (amount, amount);
     }
 
-    function getGhoAmountForBuyAsset(uint256 minAssetAmount)
-        external
-        pure
-        override
-        returns (uint256, uint256, uint256, uint256)
-    {
-        return (minAssetAmount, minAssetAmount, minAssetAmount, 0);
-    }
-
     function getGhoAmountForSellAsset(uint256 maxAssetAmount)
         external
         pure
@@ -51,22 +42,5 @@ contract MockGSM is MockGSMBase {
         returns (uint256, uint256, uint256, uint256)
     {
         return (maxGhoAmount, maxGhoAmount, maxGhoAmount, 0);
-    }
-
-    function getAssetAmountForSellAsset(uint256 minGhoAmount)
-        external
-        pure
-        override
-        returns (uint256, uint256, uint256, uint256)
-    {
-        return (minGhoAmount, minGhoAmount, minGhoAmount, 0);
-    }
-
-    function getAvailableLiquidity() external pure override returns (uint256) {
-        return type(uint256).max;
-    }
-
-    function canSwap() external pure override returns (bool) {
-        return true;
     }
 }

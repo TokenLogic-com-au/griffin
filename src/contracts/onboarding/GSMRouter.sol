@@ -101,6 +101,11 @@ contract GSMRouter is Ownable, IGSMRouter {
     }
 
     /// @inheritdoc IGSMRouter
+    function rescueToken(address token, address to, uint256 amount) external onlyOwner {
+        IERC20(token).safeTransfer(to, amount);
+    }
+
+    /// @inheritdoc IGSMRouter
     function previewSwapToGHO(address token, uint256 amount) external view returns (uint256, uint256) {
         require(amount > 0, InvalidAmount());
 
@@ -131,8 +136,4 @@ contract GSMRouter is Ownable, IGSMRouter {
         return (outputAmount, fee);
     }
 
-    /// @inheritdoc IGSMRouter
-    function rescueToken(address token, address to, uint256 amount) external onlyOwner {
-        IERC20(token).safeTransfer(to, amount);
-    }
 }

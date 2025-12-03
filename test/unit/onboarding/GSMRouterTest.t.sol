@@ -90,6 +90,8 @@ contract GSMRouterTest is Test {
 }
 
 contract SetTokenConfigTest is GSMRouterTest {
+    event TokenConfigSet(address indexed token, address indexed stataToken, address indexed gsm);
+
     function test_setNewTokenConfig() public {
         address newToken = makeAddr("newToken");
         address newStataToken = makeAddr("newStataToken");
@@ -99,6 +101,9 @@ contract SetTokenConfigTest is GSMRouterTest {
         (address stataToken, address gsm) = router.tokenConfig(newToken);
         assertEq(stataToken, address(0));
         assertEq(gsm, address(0));
+
+        vm.expectEmit(true, true, true, true);
+        emit TokenConfigSet(newToken, newStataToken, newGsm);
 
         router.setTokenConfig(newToken, newStataToken, newGsm);
 
@@ -116,6 +121,9 @@ contract SetTokenConfigTest is GSMRouterTest {
         (address stataToken, address gsm) = router.tokenConfig(USDC);
         assertEq(stataToken, STATA_USDC);
         assertEq(gsm, GSM_USDC);
+
+        vm.expectEmit(true, true, true, true);
+        emit TokenConfigSet(USDC, newStataToken, newGsm);
 
         // Update to new values
         router.setTokenConfig(USDC, newStataToken, newGsm);
@@ -203,6 +211,9 @@ contract SwapToGHOTest is GSMRouterTest {
         uint256 ghoBalanceBefore = MockERC20(GHO).balanceOf(address(this));
         uint256 usdcBalanceBefore = MockERC20(USDC).balanceOf(address(this));
 
+        vm.expectEmit(true, true, false, true);
+        emit SwapToGHO(address(this), USDC, amount, amount);
+
         uint256 received = router.swapToGHO(USDC, amount, 0);
 
         // MockGSM returns 1:1
@@ -218,6 +229,9 @@ contract SwapToGHOTest is GSMRouterTest {
 
         MockERC20(USDC).mint(address(this), amount);
         MockERC20(USDC).approve(address(router), amount);
+
+        vm.expectEmit(true, true, false, true);
+        emit SwapToGHO(address(this), USDC, amount, amount);
 
         uint256 received = router.swapToGHO(USDC, amount, minGhoAmount);
 
@@ -277,6 +291,9 @@ contract SwapFromGHOTest is GSMRouterTest {
         uint256 usdcBalanceBefore = MockERC20(USDC).balanceOf(address(this));
         uint256 ghoBalanceBefore = MockERC20(GHO).balanceOf(address(this));
 
+        vm.expectEmit(true, true, false, true);
+        emit SwapFromGHO(address(this), USDC, ghoAmount, ghoAmount);
+
         uint256 received = router.swapFromGHO(USDC, ghoAmount, 0);
 
         // MockGSM returns 1:1
@@ -294,6 +311,9 @@ contract SwapFromGHOTest is GSMRouterTest {
 
         MockERC20(GHO).mint(address(this), ghoAmount);
         MockERC20(GHO).approve(address(router), ghoAmount);
+
+        vm.expectEmit(true, true, false, true);
+        emit SwapFromGHO(address(this), USDC, ghoAmount, ghoAmount);
 
         uint256 received = router.swapFromGHO(USDC, ghoAmount, minOutputAmount);
 
@@ -390,6 +410,8 @@ contract PreviewSwapFromGHOTest is GSMRouterTest {
 }
 
 contract RescueTokenTest is GSMRouterTest {
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
     address randomToken = address(new MockERC20("RAND", "RAND", 6));
     uint256 amount = 100 * 1e6;
 
@@ -400,6 +422,10 @@ contract RescueTokenTest is GSMRouterTest {
 
         // Rescue tokens
         address recipient = makeAddr("recipient");
+
+        vm.expectEmit(true, true, false, true, randomToken);
+        emit Transfer(address(router), recipient, amount);
+
         router.rescueToken(randomToken, recipient, amount);
 
         // Verify

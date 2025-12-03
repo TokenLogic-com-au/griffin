@@ -42,17 +42,6 @@ contract MockGSMWithFees is MockGSMBase {
         return (maxAmount, ghoAmount);
     }
 
-    function getGhoAmountForBuyAsset(uint256 minAssetAmount)
-        external
-        view
-        override
-        returns (uint256, uint256, uint256, uint256)
-    {
-        uint256 ghoNeeded = (minAssetAmount * 10000) / (10000 - feeBps);
-        uint256 fee = ghoNeeded - minAssetAmount;
-        return (ghoNeeded, minAssetAmount, ghoNeeded, fee);
-    }
-
     function getGhoAmountForSellAsset(uint256 maxAssetAmount)
         external
         view
@@ -73,24 +62,5 @@ contract MockGSMWithFees is MockGSMBase {
         uint256 fee = (maxGhoAmount * feeBps) / 10000;
         uint256 assetAmount = maxGhoAmount - fee;
         return (assetAmount, maxGhoAmount, maxGhoAmount, fee);
-    }
-
-    function getAssetAmountForSellAsset(uint256 minGhoAmount)
-        external
-        view
-        override
-        returns (uint256, uint256, uint256, uint256)
-    {
-        uint256 assetNeeded = (minGhoAmount * 10000) / (10000 - feeBps);
-        uint256 fee = assetNeeded - minGhoAmount;
-        return (assetNeeded, minGhoAmount, assetNeeded, fee);
-    }
-
-    function getAvailableLiquidity() external view override returns (uint256) {
-        return type(uint256).max;
-    }
-
-    function canSwap() external view override returns (bool) {
-        return !frozen;
     }
 }
