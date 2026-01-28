@@ -35,20 +35,18 @@ USDC/USDT → [Router] → GHO
 
 1. User approves exact amount to GHO Router
 2. Router receives tokens
-3. Router supplies to Aave V3 Pool → receives aTokens
-4. Router wraps aTokens → stataTokens (ERC4626)
-5. Router approves exact stataTokens to GSM
-6. Router calls GSM.sellAsset() → receives GHO
-7. Router transfers GHO to user
+3. Router wraps tokens → stataTokens (ERC4626) which supplies to Aave V3 Pool
+4. Router approves exact stataTokens to GSM
+5. Router calls GSM.sellAsset() → receives GHO
+6. Router transfers GHO to user
 
 ### Reverse Flow: GHO → USDC/USDT
 
 1. User approves exact GHO to GHO Router
 2. Router receives GHO
 3. Router calls GSM.buyAsset() → receives stataTokens
-4. Router unwraps stataTokens → aTokens
-5. Router withdraws from Aave → receives underlying
-6. Router transfers USDC/USDT to user
+4. Router unwraps stataTokens → underlying tokens
+5. Router transfers USDC/USDT to user
 
 ## Contract Addresses (Ethereum Mainnet)
 

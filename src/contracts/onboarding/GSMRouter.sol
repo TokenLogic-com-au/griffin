@@ -53,6 +53,16 @@ contract GSMRouter is Ownable, IGSMRouter {
         IERC20(config.stataToken).forceApprove(config.gsm, stataAmount);
         (uint256 assetSold, uint256 ghoAmount) = IGSM(config.gsm).sellAsset(stataAmount, address(this));
 
+        // Clear residual allowance
+        IERC20(config.stataToken).forceApprove(config.gsm, 0);
+
+        // Handle stataToken dust if GSM didn't consume full amount
+        if (assetSold < stataAmount) {
+            uint256 dust = stataAmount - assetSold;
+            uint256 dustRedeemed = IStaticAToken(config.stataToken).redeem(dust, msg.sender, address(this));
+            emit DustReturned(msg.sender, token, dustRedeemed);
+        }
+
         require(ghoAmount >= minGHOAmount, SlippageExceeded());
 
         IERC20(GHO).safeTransfer(msg.sender, ghoAmount);
@@ -78,6 +88,16 @@ contract GSMRouter is Ownable, IGSMRouter {
         // Step 2: Swap GHO for stataToken via GSM
         IERC20(GHO).forceApprove(config.gsm, ghoAmount);
         (uint256 stataAmount, uint256 ghoBurned) = IGSM(config.gsm).buyAsset(stataAmountToBuy, address(this));
+
+        // Clear residual allowance
+        IERC20(GHO).forceApprove(config.gsm, 0);
+
+        // Handle GHO dust if GSM didn't burn full amount
+        if (ghoBurned < ghoAmount) {
+            uint256 ghoDust = ghoAmount - ghoBurned;
+            IERC20(GHO).safeTransfer(msg.sender, ghoDust);
+            emit DustReturned(msg.sender, GHO, ghoDust);
+        }
 
         // Step 3: Redeem stataToken for underlying asset
         uint256 outputAmount = IStaticAToken(config.stataToken).redeem(stataAmount, msg.sender, address(this));

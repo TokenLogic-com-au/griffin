@@ -54,6 +54,14 @@ interface IGSMRouter {
     event TokenConfigSet(address indexed token, address indexed stataToken, address indexed gsm);
 
     /**
+     * @notice Emitted when dust is returned to user due to partial GSM consumption
+     * @param user The address of the user receiving the dust
+     * @param token The address of the token returned
+     * @param amount The amount of dust returned
+     */
+    event DustReturned(address indexed user, address indexed token, uint256 amount);
+
+    /**
      * Updates a token to GSM configuration
      * @param token Address of the underlying token
      * @param stataToken Address of the stata token

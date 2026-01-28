@@ -430,15 +430,19 @@ contract ConcurrentUserTest is GSMRouterAdvancedTest {
 
 contract InvariantHandler is Test {
     GSMRouter public router;
+    MockGSMWithFees public gsm;
     address public usdc;
     address public gho;
+    address public stataUsdc;
 
     address[] public actors;
 
-    constructor(GSMRouter _router, address _usdc, address _gho) {
+    constructor(GSMRouter _router, MockGSMWithFees _gsm, address _usdc, address _gho, address _stataUsdc) {
         router = _router;
+        gsm = _gsm;
         usdc = _usdc;
         gho = _gho;
+        stataUsdc = _stataUsdc;
 
         for (uint256 i = 0; i < 5; i++) {
             actors.push(makeAddr(string(abi.encodePacked("actor", i))));
@@ -472,6 +476,11 @@ contract InvariantHandler is Test {
 
         vm.stopPrank();
     }
+
+    function setConsumptionRate(uint256 consumptionBps) external {
+        consumptionBps = bound(consumptionBps, 9000, 10000); // 90% to 100%
+        gsm.setConsumptionBps(consumptionBps);
+    }
 }
 
 contract InvariantTest is GSMRouterAdvancedTest {
@@ -480,7 +489,7 @@ contract InvariantTest is GSMRouterAdvancedTest {
     function setUp() public {
         _setUp(0, type(uint128).max);
 
-        handler = new InvariantHandler(router, USDC, GHO);
+        handler = new InvariantHandler(router, gsmUsdcWithFees, USDC, GHO, STATA_USDC);
 
         targetContract(address(handler));
     }
@@ -495,6 +504,111 @@ contract InvariantTest is GSMRouterAdvancedTest {
         assertEq(IERC20(USDC).allowance(address(router), STATA_USDC), 0, "No residual USDC approval");
         assertEq(IERC20(GHO).allowance(address(router), GSM_USDC), 0, "No residual GHO approval");
         assertEq(stataUsdcWithRate.allowance(address(router), GSM_USDC), 0, "No residual stataUSDC approval");
+    }
+}
+
+// ============================================
+// TEST 6: PARTIAL CONSUMPTION TESTS
+// ============================================
+
+contract PartialConsumptionTest is GSMRouterAdvancedTest {
+    function setUp() public {
+        _setUp(0, type(uint128).max);
+    }
+
+    function test_swapToGHO_withPartialConsumption() public {
+        // Set GSM to only consume 95% of input
+        gsmUsdcWithFees.setConsumptionBps(9500);
+
+        uint256 amount = 1000 * 1e6;
+
+        MockERC20(USDC).mint(address(this), amount);
+        IERC20(USDC).approve(address(router), amount);
+
+        router.swapToGHO(USDC, amount, 0);
+
+        // Router should have no tokens
+        assertEq(MockERC20(USDC).balanceOf(address(router)), 0, "Router should hold no USDC");
+        assertEq(MockERC20(GHO).balanceOf(address(router)), 0, "Router should hold no GHO");
+        assertEq(stataUsdcWithRate.balanceOf(address(router)), 0, "Router should hold no stataUSDC");
+
+        // User should receive dust back (5% of stataTokens redeemed = 50 USDC)
+        uint256 dustReceived = MockERC20(USDC).balanceOf(address(this));
+        uint256 expectedDust = (amount * 500) / 10000; // 5% dust
+        assertEq(dustReceived, expectedDust, "User should receive 5% dust back");
+    }
+
+    function test_swapFromGHO_withPartialConsumption() public {
+        // Set GSM to only consume 95% of GHO
+        gsmUsdcWithFees.setConsumptionBps(9500);
+
+        uint256 ghoAmount = 1000 * 1e18;
+
+        MockERC20(GHO).mint(address(this), ghoAmount);
+        IERC20(GHO).approve(address(router), ghoAmount);
+
+        uint256 initialGhoBalance = MockERC20(GHO).balanceOf(address(this));
+
+        router.swapFromGHO(USDC, ghoAmount, 0);
+
+        // Router should have no tokens
+        assertEq(MockERC20(USDC).balanceOf(address(router)), 0, "Router should hold no USDC");
+        assertEq(MockERC20(GHO).balanceOf(address(router)), 0, "Router should hold no GHO");
+        assertEq(stataUsdcWithRate.balanceOf(address(router)), 0, "Router should hold no stataUSDC");
+
+        // User should receive GHO dust back
+        uint256 finalGhoBalance = MockERC20(GHO).balanceOf(address(this));
+        assertGt(finalGhoBalance, 0, "User should receive GHO dust back");
+    }
+
+    function test_noResidualAllowances_afterPartialConsumption() public {
+        gsmUsdcWithFees.setConsumptionBps(9500);
+
+        uint256 amount = 1000 * 1e6;
+
+        MockERC20(USDC).mint(address(this), amount);
+        IERC20(USDC).approve(address(router), amount);
+
+        router.swapToGHO(USDC, amount, 0);
+
+        // No residual allowances
+        assertEq(IERC20(USDC).allowance(address(router), STATA_USDC), 0, "No residual USDC approval");
+        assertEq(stataUsdcWithRate.allowance(address(router), GSM_USDC), 0, "No residual stataUSDC approval");
+    }
+
+    function test_fuzz_partialConsumption_noResiduals(uint256 amount, uint256 consumptionBps) public {
+        amount = bound(amount, 1e6, 1_000_000 * 1e6);
+        consumptionBps = bound(consumptionBps, 9000, 10000); // 90% to 100%
+
+        gsmUsdcWithFees.setConsumptionBps(consumptionBps);
+
+        MockERC20(USDC).mint(address(this), amount);
+        IERC20(USDC).approve(address(router), amount);
+
+        router.swapToGHO(USDC, amount, 0);
+
+        // Router should never hold any tokens
+        assertEq(MockERC20(USDC).balanceOf(address(router)), 0, "Router should hold no USDC");
+        assertEq(MockERC20(GHO).balanceOf(address(router)), 0, "Router should hold no GHO");
+        assertEq(stataUsdcWithRate.balanceOf(address(router)), 0, "Router should hold no stataUSDC");
+
+        // No residual allowances
+        assertEq(IERC20(USDC).allowance(address(router), STATA_USDC), 0, "No residual USDC approval");
+        assertEq(stataUsdcWithRate.allowance(address(router), GSM_USDC), 0, "No residual stataUSDC approval");
+    }
+
+    function test_dustReturnedEvent_emitted() public {
+        gsmUsdcWithFees.setConsumptionBps(9500);
+
+        uint256 amount = 1000 * 1e6;
+
+        MockERC20(USDC).mint(address(this), amount);
+        IERC20(USDC).approve(address(router), amount);
+
+        vm.expectEmit(true, true, false, false);
+        emit IGSMRouter.DustReturned(address(this), USDC, 0); // Amount checked loosely
+
+        router.swapToGHO(USDC, amount, 0);
     }
 }
 
