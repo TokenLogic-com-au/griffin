@@ -86,7 +86,7 @@ contract MockStaticAToken is IStaticAToken {
 
     // ERC4626 interface stubs - required by interface but not used in router tests
     function asset() external view override returns (address) {
-        return address(0);
+        return underlying;
     }
 
     function totalAssets() external view override returns (uint256) {

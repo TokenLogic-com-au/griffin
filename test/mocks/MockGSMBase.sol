@@ -16,6 +16,14 @@ abstract contract MockGSMBase is IGSM {
         gho = _gho;
     }
 
+    function UNDERLYING_ASSET() external view override returns (address) {
+        return asset;
+    }
+
+    function GHO_TOKEN() external view override returns (address) {
+        return gho;
+    }
+
     // --- Core swap hooks to be implemented by children ---
     function buyAsset(uint256 minAmount, address receiver) external virtual override returns (uint256, uint256);
 

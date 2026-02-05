@@ -6,12 +6,6 @@ pragma solidity 0.8.30;
  * @notice Interface for GSMRouter contract
  */
 interface IGSMRouter {
-    /// @notice Configuration for a supported token
-    struct TokenConfig {
-        address stataToken;
-        address gsm;
-    }
-
     /// @dev GSM not configured for the given token
     error InvalidGsm();
 
@@ -46,14 +40,6 @@ interface IGSMRouter {
     event SwapFromGHO(address indexed user, address indexed outputToken, uint256 ghoAmount, uint256 outputAmount);
 
     /**
-     * @notice Emitted when a token is mapped to GSM
-     * @param token The address of the underlying token
-     * @param stataToken The address of the stata token
-     * @param gsm The address of the GSM
-     */
-    event TokenConfigSet(address indexed token, address indexed stataToken, address indexed gsm);
-
-    /**
      * @notice Emitted when dust is returned to user due to partial GSM consumption
      * @param user The address of the user receiving the dust
      * @param token The address of the token returned
@@ -62,30 +48,22 @@ interface IGSMRouter {
     event DustReturned(address indexed user, address indexed token, uint256 amount);
 
     /**
-     * Updates a token to GSM configuration
-     * @param token Address of the underlying token
-     * @param stataToken Address of the stata token
-     * @param gsm Address of the GSM
-     */
-    function setTokenConfig(address token, address stataToken, address gsm) external;
-
-    /**
      * @notice Swap underlying token to GHO
-     * @param token Underlying token address to swap from
+     * @param gsm GSM address to route the swap through
      * @param amount Amount of input token to swap
      * @param minGHOAmount Minimum amount of GHO to receive (slippage protection)
      * @return Amount of GHO received
      */
-    function swapToGHO(address token, uint256 amount, uint256 minGHOAmount) external returns (uint256);
+    function swapToGHO(address gsm, uint256 amount, uint256 minGHOAmount) external returns (uint256);
 
     /**
      * @notice Swap GHO back to underlying token
-     * @param token Underlying token address to swap to
+     * @param gsm GSM address to route the swap through
      * @param ghoAmount Amount of GHO to swap
      * @param minOutputAmount Minimum amount of output token to receive (slippage protection)
      * @return Amount of output token received
      */
-    function swapFromGHO(address token, uint256 ghoAmount, uint256 minOutputAmount) external returns (uint256);
+    function swapFromGHO(address gsm, uint256 ghoAmount, uint256 minOutputAmount) external returns (uint256);
 
     /**
      * @notice Rescue ERC20 token from the contract
@@ -98,37 +76,26 @@ interface IGSMRouter {
     /**
      * @notice Preview the amount of GHO received for a given input amount
      * @dev This is an estimation and actual results may vary slightly due to interest accrual
-     * @param token Underlying token address to swap from
+     * @param gsm GSM address to route the swap through
      * @param amount Amount of input token to sell
      * @return ghoAmount Expected amount of GHO to receive
      * @return fee Fee amount charged by the GSM
      */
-    function previewSwapToGHO(address token, uint256 amount) external view returns (uint256 ghoAmount, uint256 fee);
+    function previewSwapToGHO(address gsm, uint256 amount) external view returns (uint256 ghoAmount, uint256 fee);
 
     /**
      * @notice Preview the amount of output token received for a given GHO amount
      * @dev This is an estimation and actual results may vary slightly due to interest accrual
-     * @param token Underlying token address to swap to
+     * @param gsm GSM address to route the swap through
      * @param ghoAmount Amount of GHO to sell
      * @return assetAmount Expected amount of output token to receive
      * @return fee Fee amount charged by the GSM
      */
-    function previewSwapFromGHO(address token, uint256 ghoAmount)
-        external
-        view
-        returns (uint256 assetAmount, uint256 fee);
+    function previewSwapFromGHO(address gsm, uint256 ghoAmount) external view returns (uint256 assetAmount, uint256 fee);
 
     /**
      * @notice Returns address of the GHO token on the deployed network
      * @return Address of the token
      */
     function GHO() external view returns (address);
-
-    /**
-     * @notice Returns the configuration for a token
-     * @param token Address of the underlying token
-     * @return stataToken Address of the stataToken
-     * @return gsm Address of the GSM
-     */
-    function tokenConfig(address token) external view returns (address stataToken, address gsm);
 }

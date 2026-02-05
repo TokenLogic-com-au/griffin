@@ -26,9 +26,6 @@ contract GSMRouterTest is Test {
     uint256 internal constant GSM_LIQUIDITY = 10_000_000 * 1e18;
     uint256 internal constant MAX_LIQUIDITY = GSM_LIQUIDITY * 1000; // Ample liquidity for all test scenarios
 
-    // Storage slot for tokenConfig mapping (slot 1)
-    uint256 internal constant TOKEN_CONFIG_SLOT = 1;
-
     GSMRouter public router;
 
     address public USDC;
@@ -64,10 +61,6 @@ contract GSMRouterTest is Test {
         MockERC20(USDT).mint(STATA_USDT, MAX_LIQUIDITY);
 
         router = new GSMRouter(address(this), GHO);
-
-        // Configure token mappings
-        router.setTokenConfig(USDC, STATA_USDC, GSM_USDC);
-        router.setTokenConfig(USDT, STATA_USDT, GSM_USDT);
     }
 
     function test_constructor() public view {
@@ -80,82 +73,6 @@ contract GSMRouterTest is Test {
     function test_constructor_reverts_zeroGHO() public {
         vm.expectRevert(IGSMRouter.ZeroAddress.selector);
         new GSMRouter(address(this), address(0));
-    }
-
-    /// @dev Helper to set partial token config (only stataToken, no gsm) for testing InvalidGsm errors
-    function _setPartialTokenConfig(address token, address stataToken) internal {
-        bytes32 slot = keccak256(abi.encode(token, TOKEN_CONFIG_SLOT));
-        vm.store(address(router), slot, bytes32(uint256(uint160(stataToken))));
-    }
-}
-
-contract SetTokenConfigTest is GSMRouterTest {
-    event TokenConfigSet(address indexed token, address indexed stataToken, address indexed gsm);
-
-    function test_setNewTokenConfig() public {
-        address newToken = makeAddr("newToken");
-        address newStataToken = makeAddr("newStataToken");
-        address newGsm = makeAddr("newGsm");
-
-        // Verify config doesn't exist yet
-        (address stataToken, address gsm) = router.tokenConfig(newToken);
-        assertEq(stataToken, address(0));
-        assertEq(gsm, address(0));
-
-        vm.expectEmit(true, true, true, true);
-        emit TokenConfigSet(newToken, newStataToken, newGsm);
-
-        router.setTokenConfig(newToken, newStataToken, newGsm);
-
-        // Verify config is set
-        (stataToken, gsm) = router.tokenConfig(newToken);
-        assertEq(stataToken, newStataToken);
-        assertEq(gsm, newGsm);
-    }
-
-    function test_updateExistingConfig() public {
-        address newGsm = makeAddr("newGsm");
-        address newStataToken = makeAddr("newStataToken");
-
-        // Verify current config
-        (address stataToken, address gsm) = router.tokenConfig(USDC);
-        assertEq(stataToken, STATA_USDC);
-        assertEq(gsm, GSM_USDC);
-
-        vm.expectEmit(true, true, true, true);
-        emit TokenConfigSet(USDC, newStataToken, newGsm);
-
-        // Update to new values
-        router.setTokenConfig(USDC, newStataToken, newGsm);
-
-        // Verify config is updated
-        (stataToken, gsm) = router.tokenConfig(USDC);
-        assertEq(stataToken, newStataToken);
-        assertEq(gsm, newGsm);
-    }
-
-    function test_reverts_onlyOwner() public {
-        address newGsm = makeAddr("newGsm");
-        address notOwner = makeAddr("notOwner");
-
-        vm.prank(notOwner);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, notOwner));
-        router.setTokenConfig(USDT, STATA_USDT, newGsm);
-    }
-
-    function test_reverts_zeroToken() public {
-        vm.expectRevert(IGSMRouter.ZeroAddress.selector);
-        router.setTokenConfig(address(0), STATA_USDC, GSM_USDC);
-    }
-
-    function test_reverts_zeroStataToken() public {
-        vm.expectRevert(IGSMRouter.ZeroAddress.selector);
-        router.setTokenConfig(USDC, address(0), GSM_USDC);
-    }
-
-    function test_reverts_zeroGsm() public {
-        vm.expectRevert(IGSMRouter.ZeroAddress.selector);
-        router.setTokenConfig(USDC, STATA_USDC, address(0));
     }
 }
 
@@ -172,7 +89,7 @@ contract SwapToGHOTest is GSMRouterTest {
         vm.expectEmit(true, true, false, true);
         emit SwapToGHO(address(this), USDC, USDC_AMOUNT, expectedGhoAmount);
 
-        uint256 received = router.swapToGHO(USDC, USDC_AMOUNT, 0);
+        uint256 received = router.swapToGHO(GSM_USDC, USDC_AMOUNT, 0);
 
         assertEq(received, expectedGhoAmount, "Should return correct GHO amount");
         assertEq(MockERC20(GHO).balanceOf(address(this)), expectedGhoAmount, "User should receive GHO");
@@ -181,24 +98,22 @@ contract SwapToGHOTest is GSMRouterTest {
 
     function test_reverts_zeroAmount() public {
         vm.expectRevert(IGSMRouter.InvalidAmount.selector);
-        router.swapToGHO(USDC, 0, 0);
+        router.swapToGHO(GSM_USDC, 0, 0);
     }
 
-    function test_reverts_unsupportedToken() public {
-        address unsupportedToken = makeAddr("new-token");
-
-        vm.expectRevert(IGSMRouter.InvalidToken.selector);
-        router.swapToGHO(unsupportedToken, USDC_AMOUNT, 0);
-    }
-
-    function test_reverts_invalidGsm() public {
-        address testToken = makeAddr("testToken");
-        address testStata = makeAddr("testStata");
-
-        _setPartialTokenConfig(testToken, testStata);
+    function test_reverts_unsupportedGsm() public {
+        address unsupportedGsm = makeAddr("new-gsm");
 
         vm.expectRevert(IGSMRouter.InvalidGsm.selector);
-        router.swapToGHO(testToken, USDC_AMOUNT, 0);
+        router.swapToGHO(unsupportedGsm, USDC_AMOUNT, 0);
+    }
+
+    function test_reverts_invalidGsm_wrongGho() public {
+        address fakeGho = address(new MockERC20("FAKE", "FAKE", 18));
+        address wrongGsm = address(new MockGSM(STATA_USDC, fakeGho));
+
+        vm.expectRevert(IGSMRouter.InvalidGsm.selector);
+        router.swapToGHO(wrongGsm, USDC_AMOUNT, 0);
     }
 
     function test_fuzz_swapToGHO(uint256 amount) public {
@@ -214,7 +129,7 @@ contract SwapToGHOTest is GSMRouterTest {
         vm.expectEmit(true, true, false, true);
         emit SwapToGHO(address(this), USDC, amount, amount);
 
-        uint256 received = router.swapToGHO(USDC, amount, 0);
+        uint256 received = router.swapToGHO(GSM_USDC, amount, 0);
 
         // MockGSM returns 1:1
         assertEq(received, amount, "Should receive equal GHO amount");
@@ -233,7 +148,7 @@ contract SwapToGHOTest is GSMRouterTest {
         vm.expectEmit(true, true, false, true);
         emit SwapToGHO(address(this), USDC, amount, amount);
 
-        uint256 received = router.swapToGHO(USDC, amount, minGhoAmount);
+        uint256 received = router.swapToGHO(GSM_USDC, amount, minGhoAmount);
 
         assertGe(received, minGhoAmount, "Should receive at least minGhoAmount");
     }
@@ -252,33 +167,31 @@ contract SwapFromGHOTest is GSMRouterTest {
         vm.expectEmit(true, true, false, true);
         emit SwapFromGHO(address(this), USDC, GHO_AMOUNT, expectedUsdcAmount);
 
-        uint256 received = router.swapFromGHO(USDC, GHO_AMOUNT, 0);
+        uint256 received = router.swapFromGHO(GSM_USDC, GHO_AMOUNT, 0);
 
         assertEq(received, expectedUsdcAmount, "Should return correct USDC amount");
         assertEq(MockERC20(USDC).balanceOf(address(this)), expectedUsdcAmount, "User should receive USDC");
         assertEq(MockERC20(GHO).balanceOf(address(this)), 0, "User should spend GHO");
     }
 
-    function test_reverts_unsupportedToken() public {
-        address unsupportedToken = makeAddr("new-token");
+    function test_reverts_unsupportedGsm() public {
+        address unsupportedGsm = makeAddr("new-gsm");
 
-        vm.expectRevert(IGSMRouter.InvalidToken.selector);
-        router.swapFromGHO(unsupportedToken, GHO_AMOUNT, 0);
+        vm.expectRevert(IGSMRouter.InvalidGsm.selector);
+        router.swapFromGHO(unsupportedGsm, GHO_AMOUNT, 0);
     }
 
     function test_reverts_zeroAmount() public {
         vm.expectRevert(IGSMRouter.InvalidAmount.selector);
-        router.swapFromGHO(USDC, 0, 0);
+        router.swapFromGHO(GSM_USDC, 0, 0);
     }
 
-    function test_reverts_invalidGsm() public {
-        address testToken = makeAddr("testToken");
-        address testStata = makeAddr("testStata");
-
-        _setPartialTokenConfig(testToken, testStata);
+    function test_reverts_invalidGsm_wrongGho() public {
+        address fakeGho = address(new MockERC20("FAKE", "FAKE", 18));
+        address wrongGsm = address(new MockGSM(STATA_USDC, fakeGho));
 
         vm.expectRevert(IGSMRouter.InvalidGsm.selector);
-        router.swapFromGHO(testToken, GHO_AMOUNT, 0);
+        router.swapFromGHO(wrongGsm, GHO_AMOUNT, 0);
     }
 
     function test_fuzz_swapFromGHO(uint256 ghoAmount) public {
@@ -294,7 +207,7 @@ contract SwapFromGHOTest is GSMRouterTest {
         vm.expectEmit(true, true, false, true);
         emit SwapFromGHO(address(this), USDC, ghoAmount, ghoAmount);
 
-        uint256 received = router.swapFromGHO(USDC, ghoAmount, 0);
+        uint256 received = router.swapFromGHO(GSM_USDC, ghoAmount, 0);
 
         // MockGSM returns 1:1
         assertEq(received, ghoAmount, "Should receive equal USDC amount");
@@ -315,7 +228,7 @@ contract SwapFromGHOTest is GSMRouterTest {
         vm.expectEmit(true, true, false, true);
         emit SwapFromGHO(address(this), USDC, ghoAmount, ghoAmount);
 
-        uint256 received = router.swapFromGHO(USDC, ghoAmount, minOutputAmount);
+        uint256 received = router.swapFromGHO(GSM_USDC, ghoAmount, minOutputAmount);
 
         assertGe(received, minOutputAmount, "Should receive at least minOutputAmount");
     }
@@ -325,39 +238,37 @@ contract PreviewSwapToGHOTest is GSMRouterTest {
     function test_previewSwapToGHO_success() public view {
         uint256 expectedGhoAmount = USDC_AMOUNT; // MockGSM returns 1:1
 
-        (uint256 ghoAmount, uint256 fee) = router.previewSwapToGHO(USDC, USDC_AMOUNT);
+        (uint256 ghoAmount, uint256 fee) = router.previewSwapToGHO(GSM_USDC, USDC_AMOUNT);
 
         assertEq(ghoAmount, expectedGhoAmount, "Should preview correct GHO amount");
         assertEq(fee, 0, "Should have 0 fee in mock");
     }
 
-    function test_reverts_unsupportedToken() public {
-        address unsupportedToken = makeAddr("new-token");
+    function test_reverts_unsupportedGsm() public {
+        address unsupportedGsm = makeAddr("new-gsm");
 
-        vm.expectRevert(IGSMRouter.InvalidToken.selector);
-        router.previewSwapToGHO(unsupportedToken, USDC_AMOUNT);
+        vm.expectRevert(IGSMRouter.InvalidGsm.selector);
+        router.previewSwapToGHO(unsupportedGsm, USDC_AMOUNT);
     }
 
     function test_reverts_zeroAmount() public {
         vm.expectRevert(IGSMRouter.InvalidAmount.selector);
-        router.previewSwapToGHO(USDC, 0);
+        router.previewSwapToGHO(GSM_USDC, 0);
     }
 
-    function test_reverts_invalidGsm() public {
-        address testToken = makeAddr("testToken");
-        address testStata = makeAddr("testStata");
-
-        _setPartialTokenConfig(testToken, testStata);
+    function test_reverts_invalidGsm_wrongGho() public {
+        address fakeGho = address(new MockERC20("FAKE", "FAKE", 18));
+        address wrongGsm = address(new MockGSM(STATA_USDC, fakeGho));
 
         vm.expectRevert(IGSMRouter.InvalidGsm.selector);
-        router.previewSwapToGHO(testToken, USDC_AMOUNT);
+        router.previewSwapToGHO(wrongGsm, USDC_AMOUNT);
     }
 
     function test_fuzz_previewSwapToGHO(uint256 amount, bool useUSDT) public view {
         amount = bound(amount, 1, 1_000_000 * 1e6);
-        address token = useUSDT ? USDT : USDC;
+        address gsm = useUSDT ? GSM_USDT : GSM_USDC;
 
-        (uint256 ghoAmount, uint256 fee) = router.previewSwapToGHO(token, amount);
+        (uint256 ghoAmount, uint256 fee) = router.previewSwapToGHO(gsm, amount);
 
         // MockGSM returns 1:1 with 0 fee
         assertEq(ghoAmount, amount, "Preview should return 1:1 amount");
@@ -369,39 +280,37 @@ contract PreviewSwapFromGHOTest is GSMRouterTest {
     function test_previewSwapFromGHO_success() public view {
         uint256 expectedUsdcAmount = GHO_AMOUNT; // MockGSM returns 1:1
 
-        (uint256 outputAmount, uint256 fee) = router.previewSwapFromGHO(USDC, GHO_AMOUNT);
+        (uint256 outputAmount, uint256 fee) = router.previewSwapFromGHO(GSM_USDC, GHO_AMOUNT);
 
         assertEq(outputAmount, expectedUsdcAmount, "Should preview correct USDC amount");
         assertEq(fee, 0, "Should have 0 fee in mock");
     }
 
-    function test_reverts_unsupportedToken() public {
-        address unsupportedToken = makeAddr("new-token");
+    function test_reverts_unsupportedGsm() public {
+        address unsupportedGsm = makeAddr("new-gsm");
 
-        vm.expectRevert(IGSMRouter.InvalidToken.selector);
-        router.previewSwapFromGHO(unsupportedToken, GHO_AMOUNT);
+        vm.expectRevert(IGSMRouter.InvalidGsm.selector);
+        router.previewSwapFromGHO(unsupportedGsm, GHO_AMOUNT);
     }
 
     function test_reverts_zeroAmount() public {
         vm.expectRevert(IGSMRouter.InvalidAmount.selector);
-        router.previewSwapFromGHO(USDC, 0);
+        router.previewSwapFromGHO(GSM_USDC, 0);
     }
 
-    function test_reverts_invalidGsm() public {
-        address testToken = makeAddr("testToken");
-        address testStata = makeAddr("testStata");
-
-        _setPartialTokenConfig(testToken, testStata);
+    function test_reverts_invalidGsm_wrongGho() public {
+        address fakeGho = address(new MockERC20("FAKE", "FAKE", 18));
+        address wrongGsm = address(new MockGSM(STATA_USDC, fakeGho));
 
         vm.expectRevert(IGSMRouter.InvalidGsm.selector);
-        router.previewSwapFromGHO(testToken, GHO_AMOUNT);
+        router.previewSwapFromGHO(wrongGsm, GHO_AMOUNT);
     }
 
     function test_fuzz_previewSwapFromGHO(uint256 ghoAmount, bool useUSDT) public view {
         ghoAmount = bound(ghoAmount, 1, 1_000_000 * 1e18);
-        address token = useUSDT ? USDT : USDC;
+        address gsm = useUSDT ? GSM_USDT : GSM_USDC;
 
-        (uint256 outputAmount, uint256 fee) = router.previewSwapFromGHO(token, ghoAmount);
+        (uint256 outputAmount, uint256 fee) = router.previewSwapFromGHO(gsm, ghoAmount);
 
         // MockGSM returns 1:1 with 0 fee
         assertEq(outputAmount, ghoAmount, "Preview should return 1:1 amount");

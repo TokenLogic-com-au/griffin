@@ -36,23 +36,11 @@ contract GSMRouterTest is Test {
         vm.createSelectFork(vm.rpcUrl("mainnet"));
 
         router = new GSMRouter(address(this), GHO);
-
-        // Configure token mappings
-        router.setTokenConfig(USDC, STATA_USDC, GSM_USDC);
-        router.setTokenConfig(USDT, STATA_USDT, GSM_USDT);
     }
 
     function test_constructor() public view {
         assertEq(router.GHO(), GHO);
         assertEq(router.owner(), address(this));
-
-        (address usdcStata, address usdcGsm) = router.tokenConfig(USDC);
-        assertEq(usdcStata, STATA_USDC);
-        assertEq(usdcGsm, GSM_USDC);
-
-        (address usdtStata, address usdtGsm) = router.tokenConfig(USDT);
-        assertEq(usdtStata, STATA_USDT);
-        assertEq(usdtGsm, GSM_USDT);
     }
 }
 
@@ -65,7 +53,7 @@ contract SwapToGHOTest is GSMRouterTest {
         vm.startPrank(USER);
 
         IERC20(USDC).approve(address(router), usdcAmount);
-        uint256 ghoReceived = router.swapToGHO(USDC, usdcAmount, 0);
+        uint256 ghoReceived = router.swapToGHO(GSM_USDC, usdcAmount, 0);
 
         assertGt(ghoReceived, 0, "Should receive GHO");
 
@@ -80,7 +68,7 @@ contract SwapToGHOTest is GSMRouterTest {
         vm.startPrank(USER);
 
         SafeERC20.forceApprove(IERC20(USDT), address(router), usdtAmount);
-        uint256 ghoReceived = router.swapToGHO(USDT, usdtAmount, 0);
+        uint256 ghoReceived = router.swapToGHO(GSM_USDT, usdtAmount, 0);
 
         assertGt(ghoReceived, 0, "Should receive GHO");
 
@@ -90,7 +78,7 @@ contract SwapToGHOTest is GSMRouterTest {
     function test_reverts_swapToGHO_zeroAmount() public {
         vm.startPrank(USER);
         vm.expectRevert(IGSMRouter.InvalidAmount.selector);
-        router.swapToGHO(USDC, 0, 0);
+        router.swapToGHO(GSM_USDC, 0, 0);
         vm.stopPrank();
     }
 
@@ -105,7 +93,7 @@ contract SwapToGHOTest is GSMRouterTest {
 
         // Set unreasonably high minGHOAmount to trigger slippage
         vm.expectRevert(IGSMRouter.SlippageExceeded.selector);
-        router.swapToGHO(USDC, usdcAmount, type(uint256).max);
+        router.swapToGHO(GSM_USDC, usdcAmount, type(uint256).max);
 
         vm.stopPrank();
     }
@@ -120,7 +108,7 @@ contract SwapFromGHOTest is GSMRouterTest {
         vm.startPrank(USER);
 
         IERC20(GHO).approve(address(router), ghoAmount);
-        uint256 usdcReceived = router.swapFromGHO(USDC, ghoAmount, 0);
+        uint256 usdcReceived = router.swapFromGHO(GSM_USDC, ghoAmount, 0);
 
         assertGt(usdcReceived, 0, "Should receive USDC");
 
@@ -135,7 +123,7 @@ contract SwapFromGHOTest is GSMRouterTest {
         vm.startPrank(USER);
 
         IERC20(GHO).approve(address(router), ghoAmount);
-        uint256 usdtReceived = router.swapFromGHO(USDT, ghoAmount, 0);
+        uint256 usdtReceived = router.swapFromGHO(GSM_USDT, ghoAmount, 0);
 
         assertGt(usdtReceived, 0, "Should receive USDT");
 
@@ -145,7 +133,7 @@ contract SwapFromGHOTest is GSMRouterTest {
     function test_reverts_swapFromGHO_zeroAmount() public {
         vm.startPrank(USER);
         vm.expectRevert(IGSMRouter.InvalidAmount.selector);
-        router.swapFromGHO(USDC, 0, 0);
+        router.swapFromGHO(GSM_USDC, 0, 0);
         vm.stopPrank();
     }
 
@@ -160,7 +148,7 @@ contract SwapFromGHOTest is GSMRouterTest {
 
         // Set unreasonably high minOutputAmount to trigger slippage
         vm.expectRevert(IGSMRouter.SlippageExceeded.selector);
-        router.swapFromGHO(USDC, ghoAmount, type(uint256).max);
+        router.swapFromGHO(GSM_USDC, ghoAmount, type(uint256).max);
 
         vm.stopPrank();
     }
@@ -168,7 +156,7 @@ contract SwapFromGHOTest is GSMRouterTest {
     function test_previewSwapToGHO() public view {
         uint256 usdcAmount = 1000 * 1e6; // 1000 USDC
 
-        (uint256 ghoAmount, uint256 fee) = router.previewSwapToGHO(USDC, usdcAmount);
+        (uint256 ghoAmount, uint256 fee) = router.previewSwapToGHO(GSM_USDC, usdcAmount);
 
         assertGt(ghoAmount, 0, "Should preview GHO amount");
         // Fee might be zero depending on GSM config, so we just check it doesn't revert
@@ -178,7 +166,7 @@ contract SwapFromGHOTest is GSMRouterTest {
     function test_previewSwapFromGHO() public view {
         uint256 ghoAmount = 1000 * 1e18; // 1000 GHO
 
-        (uint256 outputAmount, uint256 fee) = router.previewSwapFromGHO(USDC, ghoAmount);
+        (uint256 outputAmount, uint256 fee) = router.previewSwapFromGHO(GSM_USDC, ghoAmount);
 
         assertGt(outputAmount, 0, "Should preview output amount");
         assertGe(fee, 0);

@@ -8,6 +8,18 @@ pragma solidity ^0.8.0;
  */
 interface IGSM {
     /**
+     * @notice Returns the underlying asset of the GSM
+     * @return The address of the underlying asset
+     */
+    function UNDERLYING_ASSET() external view returns (address);
+
+    /**
+     * @notice Returns the address of the GHO token
+     * @return The address of the GHO token contract
+     */
+    function GHO_TOKEN() external view returns (address);
+
+    /**
      * @notice Buys the GSM underlying asset in exchange for selling GHO
      * @dev Use `getAssetAmountForBuyAsset` function to calculate the amount based on the GHO amount to sell
      * @param minAmount The minimum amount of the underlying asset to buy
