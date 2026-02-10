@@ -7,6 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {GSMRouter} from "src/contracts/onboarding/GSMRouter.sol";
 import {sGHORouter} from "src/contracts/onboarding/SGHORouter.sol";
+import {IGSMRouter} from "src/interfaces/onboarding/IGSMRouter.sol";
 import {ISGHORouter} from "src/interfaces/onboarding/ISGHORouter.sol";
 
 import {MockERC20} from "test/mocks/MockERC20.sol";
@@ -92,7 +93,7 @@ contract DepositUSDCUnitTest is SGHORouterUnitBase {
         vm.expectEmit(true, true, false, true, address(helper));
         emit ISGHORouter.Deposited(USER, USDC, INPUT_AMOUNT, INPUT_AMOUNT, INPUT_AMOUNT);
 
-        uint256 shares = helper.deposit(USDC, INPUT_AMOUNT);
+        uint256 shares = helper.deposit(USDC, INPUT_AMOUNT, INPUT_AMOUNT);
         vm.stopPrank();
 
         assertEq(shares, INPUT_AMOUNT, "shares should match input with 1:1 mocks");
@@ -108,7 +109,7 @@ contract DepositUSDTUnitTest is SGHORouterUnitBase {
 
         vm.startPrank(USER);
         SafeERC20.forceApprove(IERC20(USDT), address(helper), INPUT_AMOUNT);
-        uint256 shares = helper.deposit(USDT, INPUT_AMOUNT);
+        uint256 shares = helper.deposit(USDT, INPUT_AMOUNT, INPUT_AMOUNT);
         vm.stopPrank();
 
         assertEq(shares, INPUT_AMOUNT, "shares should match input with 1:1 mocks");
@@ -124,7 +125,7 @@ contract DepositGHOUnitTest is SGHORouterUnitBase {
 
         vm.startPrank(USER);
         IERC20(GHO).approve(address(helper), GHO_AMOUNT);
-        uint256 shares = helper.deposit(GHO, GHO_AMOUNT);
+        uint256 shares = helper.deposit(GHO, GHO_AMOUNT, GHO_AMOUNT);
         vm.stopPrank();
 
         assertEq(shares, GHO_AMOUNT, "shares should match deposited GHO with 1:1 vault");
@@ -140,14 +141,14 @@ contract RedeemToUSDCUnitTest is SGHORouterUnitBase {
 
         vm.startPrank(USER);
         IERC20(GHO).approve(address(helper), INPUT_AMOUNT);
-        uint256 shares = helper.deposit(GHO, INPUT_AMOUNT);
+        uint256 shares = helper.deposit(GHO, INPUT_AMOUNT, INPUT_AMOUNT);
 
         IERC20(address(sgho)).approve(address(helper), shares);
 
         vm.expectEmit(true, true, false, true, address(helper));
         emit ISGHORouter.Redeemed(USER, USDC, shares, INPUT_AMOUNT);
 
-        uint256 usdcOut = helper.redeem(shares, USDC);
+        uint256 usdcOut = helper.redeem(shares, USDC, INPUT_AMOUNT);
         vm.stopPrank();
 
         assertEq(usdcOut, INPUT_AMOUNT, "USDC output should be 1:1 in mocks");
@@ -163,10 +164,10 @@ contract RedeemToUSDTUnitTest is SGHORouterUnitBase {
 
         vm.startPrank(USER);
         IERC20(GHO).approve(address(helper), INPUT_AMOUNT);
-        uint256 shares = helper.deposit(GHO, INPUT_AMOUNT);
+        uint256 shares = helper.deposit(GHO, INPUT_AMOUNT, INPUT_AMOUNT);
 
         IERC20(address(sgho)).approve(address(helper), shares);
-        uint256 usdtOut = helper.redeem(shares, USDT);
+        uint256 usdtOut = helper.redeem(shares, USDT, INPUT_AMOUNT);
         vm.stopPrank();
 
         assertEq(usdtOut, INPUT_AMOUNT, "USDT output should be 1:1 in mocks");
@@ -182,10 +183,10 @@ contract RedeemToGHOUnitTest is SGHORouterUnitBase {
 
         vm.startPrank(USER);
         IERC20(GHO).approve(address(helper), GHO_AMOUNT);
-        uint256 shares = helper.deposit(GHO, GHO_AMOUNT);
+        uint256 shares = helper.deposit(GHO, GHO_AMOUNT, GHO_AMOUNT);
 
         IERC20(address(sgho)).approve(address(helper), shares);
-        uint256 ghoOut = helper.redeem(shares, GHO);
+        uint256 ghoOut = helper.redeem(shares, GHO, GHO_AMOUNT);
         vm.stopPrank();
 
         assertEq(ghoOut, GHO_AMOUNT, "GHO output should match shares with 1:1 vault");
@@ -201,25 +202,51 @@ contract SGHORouterRevertUnitTest is SGHORouterUnitBase {
     function test_revert_deposit_zeroAmount() public {
         vm.prank(USER);
         vm.expectRevert(ISGHORouter.InvalidAmount.selector);
-        helper.deposit(USDC, 0);
+        helper.deposit(USDC, 0, 0);
     }
 
     function test_revert_redeem_zeroShares() public {
         vm.prank(USER);
         vm.expectRevert(ISGHORouter.InvalidAmount.selector);
-        helper.redeem(0, USDC);
+        helper.redeem(0, USDC, 0);
     }
 
     function test_revert_deposit_invalidToken() public {
         vm.prank(USER);
         vm.expectRevert(ISGHORouter.InvalidToken.selector);
-        helper.deposit(INVALID_TOKEN, INPUT_AMOUNT);
+        helper.deposit(INVALID_TOKEN, INPUT_AMOUNT, INPUT_AMOUNT);
     }
 
     function test_revert_redeem_invalidToken() public {
         vm.prank(USER);
         vm.expectRevert(ISGHORouter.InvalidToken.selector);
-        helper.redeem(INPUT_AMOUNT, INVALID_TOKEN);
+        helper.redeem(INPUT_AMOUNT, INVALID_TOKEN, INPUT_AMOUNT);
+    }
+
+    function test_revert_deposit_slippageExceeded_onSwapToGHO() public {
+        MockERC20(USDC).mint(USER, INPUT_AMOUNT);
+
+        vm.startPrank(USER);
+        IERC20(USDC).approve(address(helper), INPUT_AMOUNT);
+
+        vm.expectRevert(IGSMRouter.SlippageExceeded.selector);
+        helper.deposit(USDC, INPUT_AMOUNT, INPUT_AMOUNT + 1);
+
+        vm.stopPrank();
+    }
+
+    function test_revert_redeem_slippageExceeded_onSwapFromGHO() public {
+        MockERC20(GHO).mint(USER, INPUT_AMOUNT);
+
+        vm.startPrank(USER);
+        IERC20(GHO).approve(address(helper), INPUT_AMOUNT);
+        uint256 shares = helper.deposit(GHO, INPUT_AMOUNT, INPUT_AMOUNT);
+        IERC20(address(sgho)).approve(address(helper), shares);
+
+        vm.expectRevert(IGSMRouter.SlippageExceeded.selector);
+        helper.redeem(shares, USDC, INPUT_AMOUNT + 1);
+
+        vm.stopPrank();
     }
 }
 
@@ -287,7 +314,7 @@ contract SGHORouterDustUnitTest is Test {
         vm.expectEmit(true, true, false, true, address(helper));
         emit ISGHORouter.Deposited(USER, USDC, INPUT_AMOUNT, expectedGhoAmount, expectedShares);
 
-        uint256 shares = helper.deposit(USDC, INPUT_AMOUNT);
+        uint256 shares = helper.deposit(USDC, INPUT_AMOUNT, expectedGhoAmount);
         vm.stopPrank();
 
         assertEq(shares, expectedShares, "shares should reflect consumed amount");
@@ -303,7 +330,7 @@ contract SGHORouterDustUnitTest is Test {
 
         vm.startPrank(USER);
         IERC20(GHO).approve(address(helper), INPUT_AMOUNT);
-        uint256 shares = helper.deposit(GHO, INPUT_AMOUNT);
+        uint256 shares = helper.deposit(GHO, INPUT_AMOUNT, INPUT_AMOUNT);
 
         IERC20(address(sgho)).approve(address(helper), shares);
 
@@ -313,7 +340,7 @@ contract SGHORouterDustUnitTest is Test {
         vm.expectEmit(true, true, false, true, address(helper));
         emit ISGHORouter.Redeemed(USER, USDC, shares, expectedUsdcOut);
 
-        uint256 usdcOut = helper.redeem(shares, USDC);
+        uint256 usdcOut = helper.redeem(shares, USDC, expectedUsdcOut);
         vm.stopPrank();
 
         assertEq(usdcOut, expectedUsdcOut, "USDC output should reflect 95% consumption");
@@ -385,7 +412,7 @@ contract SGHORouterExchangeRateUnitTest is Test {
         vm.expectEmit(true, true, false, true, address(helper));
         emit ISGHORouter.Deposited(USER, USDC, INPUT_AMOUNT, expectedGhoAmount, expectedShares);
 
-        uint256 shares = helper.deposit(USDC, INPUT_AMOUNT);
+        uint256 shares = helper.deposit(USDC, INPUT_AMOUNT, expectedGhoAmount);
         vm.stopPrank();
 
         assertEq(shares, expectedShares, "shares should follow exchange rate");
@@ -400,7 +427,7 @@ contract SGHORouterExchangeRateUnitTest is Test {
 
         vm.startPrank(USER);
         IERC20(GHO).approve(address(helper), GHO_AMOUNT);
-        uint256 shares = helper.deposit(GHO, GHO_AMOUNT);
+        uint256 shares = helper.deposit(GHO, GHO_AMOUNT, GHO_AMOUNT);
         vm.stopPrank();
 
         sgho.setExchangeRate(accruedRate);
@@ -416,7 +443,7 @@ contract SGHORouterExchangeRateUnitTest is Test {
         vm.expectEmit(true, true, false, true, address(helper));
         emit ISGHORouter.Redeemed(USER, GHO, shares, expectedAssets);
 
-        uint256 redeemedAssets = helper.redeem(shares, GHO);
+        uint256 redeemedAssets = helper.redeem(shares, GHO, expectedAssets);
         vm.stopPrank();
 
         assertEq(redeemedAssets, expectedAssets, "redeemed assets should follow accrued rate");

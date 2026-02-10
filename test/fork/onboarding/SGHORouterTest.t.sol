@@ -46,11 +46,11 @@ contract SGHORouterForkTest is Test {
 
         vm.startPrank(USER);
         IERC20(USDC).approve(address(helper), usdcAmount);
-        uint256 shares = helper.deposit(USDC, usdcAmount);
+        uint256 shares = helper.deposit(USDC, usdcAmount, 1);
         assertGt(shares, 0, "USDC deposit should mint shares");
 
         IERC20(address(sgho)).approve(address(helper), shares);
-        uint256 usdcOut = helper.redeem(shares, USDC);
+        uint256 usdcOut = helper.redeem(shares, USDC, 1);
         vm.stopPrank();
 
         assertGt(usdcOut, 0, "USDC redeem output should be > 0");
@@ -67,11 +67,11 @@ contract SGHORouterForkTest is Test {
 
         vm.startPrank(USER);
         SafeERC20.forceApprove(IERC20(USDT), address(helper), usdtAmount);
-        uint256 shares = helper.deposit(USDT, usdtAmount);
+        uint256 shares = helper.deposit(USDT, usdtAmount, 1);
         assertGt(shares, 0, "USDT deposit should mint shares");
 
         IERC20(address(sgho)).approve(address(helper), shares);
-        uint256 usdtOut = helper.redeem(shares, USDT);
+        uint256 usdtOut = helper.redeem(shares, USDT, 1);
         vm.stopPrank();
 
         assertGt(usdtOut, 0, "USDT redeem output should be > 0");
@@ -87,11 +87,11 @@ contract SGHORouterForkTest is Test {
 
         vm.startPrank(USER);
         IERC20(GHO).approve(address(helper), ghoAmount);
-        uint256 shares = helper.deposit(GHO, ghoAmount);
+        uint256 shares = helper.deposit(GHO, ghoAmount, ghoAmount);
         assertEq(shares, ghoAmount, "mock sGHO is 1:1");
 
         IERC20(address(sgho)).approve(address(helper), shares);
-        uint256 ghoOut = helper.redeem(shares, GHO);
+        uint256 ghoOut = helper.redeem(shares, GHO, ghoAmount);
         vm.stopPrank();
 
         assertEq(ghoOut, ghoAmount, "GHO round-trip should be 1:1 through mock sGHO");

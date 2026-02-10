@@ -15,6 +15,9 @@ interface ISGHORouter {
     /// @dev Amount or shares must be greater than zero.
     error InvalidAmount();
 
+    /// @dev Swap/redeem output is lower than user minimum.
+    error SlippageExceeded();
+
     /// @dev GSM, router, or sGHO configuration is invalid.
     error InvalidConfiguration();
 
@@ -52,18 +55,20 @@ interface ISGHORouter {
      * @dev USDC/USDT are routed through GSMRouter into GHO first.
      * @param token Input token (USDC/USDT/GHO).
      * @param amount Input token amount.
+     * @param minOutputAmount Minimum GHO output expected from the swap leg.
      * @return shares Amount of sGHO shares minted to caller.
      */
-    function deposit(address token, uint256 amount) external returns (uint256 shares);
+    function deposit(address token, uint256 amount, uint256 minOutputAmount) external returns (uint256 shares);
 
     /**
      * @notice Redeem sGHO shares for USDC, USDT, or GHO.
      * @dev For USDC/USDT output, shares are redeemed to GHO first then routed via GSMRouter.
      * @param shares Amount of sGHO shares to redeem.
      * @param token Output token requested (USDC/USDT/GHO).
+     * @param minOutputAmount Minimum output token amount expected.
      * @return amountOut Amount of output token transferred to caller.
      */
-    function redeem(uint256 shares, address token) external returns (uint256 amountOut);
+    function redeem(uint256 shares, address token, uint256 minOutputAmount) external returns (uint256 amountOut);
 
     function GSM_ROUTER() external view returns (address);
     function SGHO() external view returns (address);

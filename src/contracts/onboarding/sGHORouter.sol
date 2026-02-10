@@ -69,25 +69,26 @@ contract sGHORouter is ISGHORouter {
     }
 
     /// @inheritdoc ISGHORouter
-    function deposit(address token, uint256 amount) external returns (uint256 shares) {
+    function deposit(address token, uint256 amount, uint256 minOutputAmount) external returns (uint256 shares) {
         require(amount > 0, InvalidAmount());
 
-        uint256 preGhoBalance = IERC20(GHO).balanceOf(address(this));
-        uint256 preInputBalance;
+        uint256 beforeGhoBalance = IERC20(GHO).balanceOf(address(this));
+        uint256 beforeInputBalance;
         bool routedViaGsm;
         uint256 ghoAmount;
 
         if (token == GHO) {
             IERC20(GHO).safeTransferFrom(msg.sender, address(this), amount);
             ghoAmount = amount;
+            require(ghoAmount >= minOutputAmount, SlippageExceeded());
         } else {
             address gsm = _getGsmForToken(token);
-            preInputBalance = IERC20(token).balanceOf(address(this));
+            beforeInputBalance = IERC20(token).balanceOf(address(this));
             routedViaGsm = true;
 
             IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
             IERC20(token).forceApprove(GSM_ROUTER, amount);
-            ghoAmount = IGSMRouter(GSM_ROUTER).swapToGHO(gsm, amount, 0);
+            ghoAmount = IGSMRouter(GSM_ROUTER).swapToGHO(gsm, amount, minOutputAmount);
             IERC20(token).forceApprove(GSM_ROUTER, 0);
         }
 
@@ -95,34 +96,36 @@ contract sGHORouter is ISGHORouter {
         shares = IERC4626(SGHO).deposit(ghoAmount, msg.sender);
         IERC20(GHO).forceApprove(SGHO, 0);
 
-        if (routedViaGsm) _returnDust(token, preInputBalance, msg.sender);
-        _returnDust(GHO, preGhoBalance, msg.sender);
+        if (routedViaGsm) _returnDust(token, beforeInputBalance, msg.sender);
+        _returnDust(GHO, beforeGhoBalance, msg.sender);
 
         emit Deposited(msg.sender, token, amount, ghoAmount, shares);
     }
 
     /// @inheritdoc ISGHORouter
-    function redeem(uint256 shares, address token) external returns (uint256 amountOut) {
+    function redeem(uint256 shares, address token, uint256 minOutputAmount) external returns (uint256 amountOut) {
         require(shares > 0, InvalidAmount());
 
         if (token == GHO) {
             amountOut = IERC4626(SGHO).redeem(shares, msg.sender, msg.sender);
+            require(amountOut >= minOutputAmount, SlippageExceeded());
             emit Redeemed(msg.sender, token, shares, amountOut);
             return amountOut;
         }
 
         address gsm = _getGsmForToken(token);
-        uint256 preOutputBalance = IERC20(token).balanceOf(address(this));
-        uint256 preGhoBalance = IERC20(GHO).balanceOf(address(this));
+        uint256 beforeOutputBalance = IERC20(token).balanceOf(address(this));
+        uint256 beforeGhoBalance = IERC20(GHO).balanceOf(address(this));
 
         uint256 ghoAmount = IERC4626(SGHO).redeem(shares, address(this), msg.sender);
 
         IERC20(GHO).forceApprove(GSM_ROUTER, ghoAmount);
-        IGSMRouter(GSM_ROUTER).swapFromGHO(gsm, ghoAmount, 0);
+        IGSMRouter(GSM_ROUTER).swapFromGHO(gsm, ghoAmount, minOutputAmount);
         IERC20(GHO).forceApprove(GSM_ROUTER, 0);
 
-        amountOut = _transferBalanceDelta(token, preOutputBalance, msg.sender);
-        _returnDust(GHO, preGhoBalance, msg.sender);
+        amountOut = _transferBalanceDelta(token, beforeOutputBalance, msg.sender);
+        require(amountOut >= minOutputAmount, SlippageExceeded());
+        _returnDust(GHO, beforeGhoBalance, msg.sender);
 
         emit Redeemed(msg.sender, token, shares, amountOut);
     }
@@ -170,19 +173,19 @@ contract sGHORouter is ISGHORouter {
         revert InvalidToken();
     }
 
-    function _transferBalanceDelta(address token, uint256 preBalance, address receiver)
+    function _transferBalanceDelta(address token, uint256 beforeBalance, address receiver)
         internal
         returns (uint256 delta)
     {
-        uint256 postBalance = IERC20(token).balanceOf(address(this));
-        if (postBalance <= preBalance) return 0;
+        uint256 afterBalance = IERC20(token).balanceOf(address(this));
+        if (afterBalance <= beforeBalance) return 0;
 
-        delta = postBalance - preBalance;
+        delta = afterBalance - beforeBalance;
         IERC20(token).safeTransfer(receiver, delta);
     }
 
-    function _returnDust(address token, uint256 preBalance, address receiver) internal {
-        uint256 dust = _transferBalanceDelta(token, preBalance, receiver);
+    function _returnDust(address token, uint256 beforeBalance, address receiver) internal {
+        uint256 dust = _transferBalanceDelta(token, beforeBalance, receiver);
         if (dust == 0) return;
 
         emit DustReturned(receiver, token, dust);

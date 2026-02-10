@@ -78,7 +78,7 @@ contract SGHORouterFlowFuzzTest is SGHORouterFuzzBase {
         vm.expectEmit(true, true, false, true, address(helper));
         emit ISGHORouter.Deposited(USER, USDC, amount, amount, amount);
 
-        uint256 shares = helper.deposit(USDC, amount);
+        uint256 shares = helper.deposit(USDC, amount, amount);
         vm.stopPrank();
 
         assertEq(shares, amount, "shares should match input at 1:1");
@@ -92,14 +92,14 @@ contract SGHORouterFlowFuzzTest is SGHORouterFuzzBase {
 
         vm.startPrank(USER);
         IERC20(USDC).approve(address(helper), amount);
-        uint256 shares = helper.deposit(USDC, amount);
+        uint256 shares = helper.deposit(USDC, amount, amount);
 
         IERC20(address(sgho)).approve(address(helper), shares);
 
         vm.expectEmit(true, true, false, true, address(helper));
         emit ISGHORouter.Redeemed(USER, USDC, shares, amount);
 
-        uint256 usdcOut = helper.redeem(shares, USDC);
+        uint256 usdcOut = helper.redeem(shares, USDC, amount);
         vm.stopPrank();
 
         assertEq(usdcOut, amount, "round-trip should preserve amount at 1:1");
@@ -114,9 +114,9 @@ contract SGHORouterFlowFuzzTest is SGHORouterFuzzBase {
 
         vm.startPrank(USER);
         SafeERC20.forceApprove(IERC20(USDT), address(helper), amount);
-        uint256 shares = helper.deposit(USDT, amount);
+        uint256 shares = helper.deposit(USDT, amount, amount);
         IERC20(address(sgho)).approve(address(helper), shares);
-        uint256 usdtOut = helper.redeem(shares, USDT);
+        uint256 usdtOut = helper.redeem(shares, USDT, amount);
         vm.stopPrank();
 
         assertEq(usdtOut, amount, "round-trip should preserve amount at 1:1");
@@ -131,9 +131,9 @@ contract SGHORouterFlowFuzzTest is SGHORouterFuzzBase {
 
         vm.startPrank(USER);
         IERC20(GHO).approve(address(helper), amount);
-        uint256 shares = helper.deposit(GHO, amount);
+        uint256 shares = helper.deposit(GHO, amount, amount);
         IERC20(address(sgho)).approve(address(helper), shares);
-        uint256 ghoOut = helper.redeem(shares, GHO);
+        uint256 ghoOut = helper.redeem(shares, GHO, amount);
         vm.stopPrank();
 
         assertEq(shares, amount, "shares should match direct GHO deposit at 1:1");
@@ -210,7 +210,7 @@ contract SGHORouterDustFuzzTest is Test {
         vm.expectEmit(true, true, false, true, address(helper));
         emit ISGHORouter.Deposited(USER, USDC, amount, expectedConsumed, expectedConsumed);
 
-        uint256 shares = helper.deposit(USDC, amount);
+        uint256 shares = helper.deposit(USDC, amount, expectedConsumed);
         vm.stopPrank();
 
         assertEq(shares, expectedConsumed, "shares should equal consumed input");
@@ -232,7 +232,7 @@ contract SGHORouterDustFuzzTest is Test {
 
         vm.startPrank(USER);
         IERC20(GHO).approve(address(helper), amount);
-        uint256 shares = helper.deposit(GHO, amount);
+        uint256 shares = helper.deposit(GHO, amount, amount);
         IERC20(address(sgho)).approve(address(helper), shares);
 
         if (expectedGhoDust > 0) {
@@ -243,7 +243,7 @@ contract SGHORouterDustFuzzTest is Test {
         vm.expectEmit(true, true, false, true, address(helper));
         emit ISGHORouter.Redeemed(USER, USDC, shares, expectedUsdcOut);
 
-        uint256 usdcOut = helper.redeem(shares, USDC);
+        uint256 usdcOut = helper.redeem(shares, USDC, expectedUsdcOut);
         vm.stopPrank();
 
         assertEq(usdcOut, expectedUsdcOut, "USDC output should match consumed amount");
@@ -308,7 +308,7 @@ contract SGHORouterExchangeRateFuzzTest is Test {
 
         vm.startPrank(USER);
         IERC20(USDC).approve(address(helper), amount);
-        uint256 shares = helper.deposit(USDC, amount);
+        uint256 shares = helper.deposit(USDC, amount, amount);
         vm.stopPrank();
 
         assertEq(shares, expectedShares, "shares should follow configured exchange rate");
@@ -330,7 +330,7 @@ contract SGHORouterExchangeRateFuzzTest is Test {
 
         vm.startPrank(USER);
         IERC20(GHO).approve(address(helper), amount);
-        uint256 shares = helper.deposit(GHO, amount);
+        uint256 shares = helper.deposit(GHO, amount, amount);
         vm.stopPrank();
 
         sgho.setExchangeRate(redeemRate);
@@ -342,7 +342,7 @@ contract SGHORouterExchangeRateFuzzTest is Test {
 
         vm.startPrank(USER);
         IERC20(address(sgho)).approve(address(helper), shares);
-        uint256 redeemed = helper.redeem(shares, GHO);
+        uint256 redeemed = helper.redeem(shares, GHO, expectedAssets);
         vm.stopPrank();
 
         assertEq(redeemed, expectedAssets, "redeemed assets should follow updated rate");

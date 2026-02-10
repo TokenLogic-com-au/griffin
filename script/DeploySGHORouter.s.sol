@@ -3,7 +3,7 @@ pragma solidity 0.8.30;
 
 import {Script, console2} from "forge-std/Script.sol";
 
-import {SGHORouter} from "src/contracts/onboarding/SGHORouter.sol";
+import {sGHORouter} from "src/contracts/onboarding/SGHORouter.sol";
 
 /**
  * @title DeploySGHORouter
@@ -29,7 +29,7 @@ contract DeploySGHORouter is Script {
     address public constant MAINNET_GSM_USDC = 0xFeeb6FE430B7523fEF2a38327241eE7153779535;
     address public constant MAINNET_GSM_USDT = 0x535b2f7C20B9C83d70e519cf9991578eF9816B7B;
 
-    function run() external returns (SGHORouter helper) {
+    function run() external returns (sGHORouter helper) {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
         address sgho = vm.envAddress("SGHO");
@@ -43,7 +43,7 @@ contract DeploySGHORouter is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        helper = new SGHORouter(gsmRouter, sgho, gho, usdc, usdt, gsmUsdc, gsmUsdt);
+        helper = new sGHORouter(gsmRouter, sgho, gho, usdc, usdt, gsmUsdc, gsmUsdt);
 
         vm.stopBroadcast();
 
