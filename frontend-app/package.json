@@ -1,0 +1,42 @@
+{
+  "name": "sgho-router-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint src/",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "faucet": "bash scripts/faucet.sh",
+    "deploy:local": "bash scripts/deploy-local.sh"
+  },
+  "dependencies": {
+    "@eslint/eslintrc": "^3.3.3",
+    "@tanstack/react-query": "^5.90.21",
+    "connectkit": "^1.9.1",
+    "next": "^16.1.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "viem": "^2.45.3",
+    "wagmi": "^2.19.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@types/node": "^20.17.12",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.39.2",
+    "eslint-config-next": "^16.1.6",
+    "jsdom": "^25.0.1",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

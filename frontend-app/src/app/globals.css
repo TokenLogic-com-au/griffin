@@ -1,0 +1,140 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-primary: #0d0f1a;
+    --bg-secondary: #15172b;
+    --bg-surface: #1c1f36;
+    --bg-hover: #24273f;
+    --border-primary: #2b2e4a;
+    --border-secondary: #21243c;
+    --text-primary: #f1f1f3;
+    --text-secondary: #a5a8c6;
+    --text-muted: #62658a;
+    --aave-teal: #2ebac6;
+    --aave-purple: #b6509e;
+    --aave-gradient: linear-gradient(135deg, #b6509e, #2ebac6);
+    --success: #3bba9c;
+    --warning: #f0b429;
+    --error: #e25555;
+    --input-bg: #111325;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-primary) transparent;
+  }
+
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  /* -- Cards -- */
+  .card {
+    @apply rounded-lg border bg-[var(--bg-secondary)] p-6;
+    border-color: var(--border-secondary);
+  }
+
+  .card-surface {
+    @apply rounded-lg border bg-[var(--bg-surface)] p-4;
+    border-color: var(--border-primary);
+  }
+
+  /* -- Buttons -- */
+  .btn-primary {
+    @apply relative overflow-hidden rounded-md px-6 py-3.5 text-sm font-semibold text-white transition-all;
+    background: var(--aave-gradient);
+  }
+  .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.12);
+  }
+  .btn-primary:disabled {
+    @apply cursor-not-allowed;
+    background: var(--bg-hover);
+    color: var(--text-muted);
+  }
+
+  .btn-ghost {
+    @apply rounded-md border px-4 py-2.5 text-sm font-medium transition-colors;
+    border-color: var(--border-primary);
+    color: var(--text-secondary);
+  }
+  .btn-ghost:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--text-muted);
+  }
+
+  /* -- Input -- */
+  .input-field {
+    @apply w-full border-0 bg-transparent px-0 py-1 text-2xl font-semibold outline-none placeholder-[var(--text-muted)];
+    color: var(--text-primary);
+  }
+
+  .input-box {
+    @apply flex items-center justify-between rounded-lg border px-4 py-3;
+    background: var(--input-bg);
+    border-color: var(--border-primary);
+    transition: border-color 0.15s;
+  }
+  .input-box:focus-within {
+    border-color: var(--aave-teal);
+  }
+
+  /* -- Tabs -- */
+  .tab-active {
+    @apply relative pb-3 text-sm font-semibold;
+    color: var(--text-primary);
+  }
+  .tab-active::after {
+    content: "";
+    @apply absolute bottom-0 left-0 h-0.5 w-full rounded-full;
+    background: var(--aave-gradient);
+  }
+
+  .tab-inactive {
+    @apply pb-3 text-sm font-semibold transition-colors;
+    color: var(--text-muted);
+  }
+  .tab-inactive:hover {
+    color: var(--text-secondary);
+  }
+
+  /* -- Stat pill -- */
+  .stat-value {
+    @apply text-lg font-bold tabular-nums;
+    color: var(--text-primary);
+  }
+  .stat-label {
+    @apply text-xs font-medium;
+    color: var(--text-muted);
+  }
+
+  /* -- Hero card -- */
+  .hero-card {
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, #111428 50%, #0f1525 100%);
+  }
+}
+
+/* -- Modal animation -- */
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal-in {
+  animation: modal-in 0.2s ease-out;
+}

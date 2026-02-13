@@ -1,0 +1,206 @@
+"use client";
+
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { parseUnits } from "viem";
+
+import { TokenSelector } from "./TokenSelector";
+import { AmountInput } from "./AmountInput";
+import { TransactionPreview } from "./TransactionPreview";
+import { TransactionStatus } from "./TransactionStatus";
+import { ErrorDisplay } from "./ErrorDisplay";
+
+import { useTokenBalances } from "@/hooks/useTokenBalances";
+import { useSGHOAllowance } from "@/hooks/useAllowance";
+import { usePreviewRedeem } from "@/hooks/usePreviewRedeem";
+import { useApprove } from "@/hooks/useApprove";
+import { useRedeem } from "@/hooks/useRedeem";
+
+import { getTokenBySymbol, DEFAULT_SLIPPAGE_BPS } from "@/config/tokens";
+import { addresses } from "@/config/addresses";
+import { validateShares, applySlippage } from "@/lib/validation";
+import { formatTokenAmount } from "@/lib/formatting";
+import { trackEvent } from "@/lib/analytics";
+import type { SupportedToken, TransactionStep } from "@/types";
+
+export function RedeemForm() {
+  const [outputToken, setOutputToken] = useState<SupportedToken>("GHO");
+  const [sharesStr, setSharesStr] = useState("");
+  const [slippageBps, setSlippageBps] = useState(DEFAULT_SLIPPAGE_BPS);
+  const [showSettings, setShowSettings] = useState(false);
+
+  const token = getTokenBySymbol(outputToken);
+  const { balances, refetch: refetchBalances } = useTokenBalances();
+  const sGHOBalance = balances.sGHO ?? 0n;
+
+  const sGHOTokenInfo = useMemo(
+    () => ({ symbol: "sGHO" as SupportedToken, name: "sGHO Shares", address: addresses.sGHO, decimals: 18, icon: "" }),
+    []
+  );
+
+  const parsedShares = useMemo(() => {
+    if (!sharesStr) return undefined;
+    try { const val = parseUnits(sharesStr, 18); return val > 0n ? val : undefined; } catch { return undefined; }
+  }, [sharesStr]);
+
+  const validation = useMemo(
+    () => (sharesStr ? validateShares(sharesStr, sGHOBalance) : { valid: false }),
+    [sharesStr, sGHOBalance]
+  );
+
+  const { allowance, refetch: refetchAllowance } = useSGHOAllowance();
+  const needsApproval = parsedShares !== undefined && allowance < parsedShares;
+
+  const { preview, isLoading: previewLoading } = usePreviewRedeem(parsedShares, token.address);
+
+  const {
+    approve, txHash: approveTxHash, status: approveStatus,
+    error: approveError, reset: resetApprove,
+  } = useApprove();
+
+  const {
+    redeem, txHash: redeemTxHash, status: redeemStatus,
+    error: redeemError, redeemEvent, dustEvents, reset: resetRedeem,
+  } = useRedeem();
+
+  useEffect(() => { if (approveStatus === "success") refetchAllowance(); }, [approveStatus, refetchAllowance]);
+
+  useEffect(() => {
+    if (redeemStatus === "success") {
+      refetchBalances(); refetchAllowance();
+      if (redeemTxHash) {
+        trackEvent({ type: "redeem_completed", token: outputToken, amountOut: redeemEvent?.outputAmount?.toString() ?? "0", txHash: redeemTxHash });
+      }
+    }
+  }, [redeemStatus, refetchBalances, refetchAllowance, redeemTxHash, outputToken, redeemEvent]);
+
+  const steps: TransactionStep[] = useMemo(() => {
+    const result: TransactionStep[] = [];
+    if (needsApproval || approveStatus !== "idle") {
+      result.push({ label: "Approve sGHO", status: approveStatus, txHash: approveTxHash, error: approveError?.message });
+    }
+    if (redeemStatus !== "idle" || approveStatus === "success" || !needsApproval) {
+      result.push({ label: `Redeem to ${outputToken}`, status: redeemStatus, txHash: redeemTxHash, error: redeemError?.message });
+    }
+    return result;
+  }, [needsApproval, approveStatus, approveTxHash, approveError, redeemStatus, redeemTxHash, redeemError, outputToken]);
+
+  const isInProgress = ["pending", "confirming"].includes(approveStatus) || ["pending", "confirming"].includes(redeemStatus);
+
+  const handleSubmit = useCallback(() => {
+    if (!parsedShares || !validation.valid || !preview) return;
+    const minOutput = applySlippage(preview.estimatedOutput, slippageBps);
+    if (needsApproval) { approve(addresses.sGHO, parsedShares, outputToken); }
+    else { redeem(parsedShares, token.address, minOutput, outputToken); }
+  }, [parsedShares, validation.valid, preview, slippageBps, needsApproval, approve, redeem, token.address, outputToken]);
+
+  useEffect(() => {
+    if (approveStatus === "success" && redeemStatus === "idle" && parsedShares && preview) {
+      const minOutput = applySlippage(preview.estimatedOutput, slippageBps);
+      redeem(parsedShares, token.address, minOutput, outputToken);
+    }
+  }, [approveStatus, redeemStatus, parsedShares, preview, slippageBps, redeem, token.address, outputToken]);
+
+  const handleReset = () => { resetApprove(); resetRedeem(); setSharesStr(""); };
+
+  let buttonLabel = "Enter shares amount";
+  let buttonDisabled = true;
+  if (!sharesStr) { buttonLabel = "Enter shares amount"; }
+  else if (!validation.valid) { buttonLabel = validation.error ?? "Invalid input"; }
+  else if (previewLoading) { buttonLabel = needsApproval ? "Approve & Redeem" : "Redeem"; }
+  else if (isInProgress) { buttonLabel = "Processing..."; }
+  else if (needsApproval) { buttonLabel = "Approve & Redeem"; buttonDisabled = false; }
+  else if (validation.valid && preview) { buttonLabel = "Redeem"; buttonDisabled = false; }
+
+  const showStepper = approveStatus !== "idle" || redeemStatus !== "idle";
+  const outputDecimals = outputToken === "GHO" ? 18 : 6;
+
+  return (
+    <div className="space-y-5">
+      {/* Shares input */}
+      <AmountInput
+        value={sharesStr}
+        onChange={setSharesStr}
+        token={sGHOTokenInfo}
+        balance={sGHOBalance}
+        label="sGHO shares to redeem"
+        disabled={isInProgress}
+        error={sharesStr && !validation.valid ? validation.error : undefined}
+      />
+
+      {/* Receive as */}
+      <div className="flex items-center justify-between rounded-lg border border-[var(--border-secondary)] bg-[var(--input-bg)] px-4 py-3">
+        <span className="text-sm text-[var(--text-muted)]">Receive as</span>
+        <TokenSelector
+          selected={outputToken}
+          onChange={(t) => { setOutputToken(t); resetApprove(); resetRedeem(); }}
+          disabled={isInProgress}
+        />
+      </div>
+
+      {/* Settings */}
+      <div className="flex items-center justify-between px-1">
+        <button
+          type="button"
+          onClick={() => setShowSettings(!showSettings)}
+          className="flex items-center gap-1 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text-secondary)]"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.066z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          Slippage {(slippageBps / 100).toFixed(1)}%
+        </button>
+      </div>
+      {showSettings && (
+        <div className="flex gap-1.5 px-1">
+          {[10, 50, 100, 200].map((bps) => (
+            <button
+              key={bps} type="button" onClick={() => setSlippageBps(bps)}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                slippageBps === bps
+                  ? "bg-[var(--aave-teal)]/15 text-[var(--aave-teal)]"
+                  : "bg-[var(--bg-surface)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+              }`}
+            >{(bps / 100).toFixed(1)}%</button>
+          ))}
+        </div>
+      )}
+
+      {/* Preview */}
+      {parsedShares && parsedShares > 0n && (
+        <TransactionPreview type="redeem" preview={preview} outputToken={outputToken} slippageBps={slippageBps} />
+      )}
+
+      {/* Stepper */}
+      {showStepper && <TransactionStatus steps={steps} onReset={handleReset} />}
+
+      {/* Errors */}
+      {!showStepper && (approveError || redeemError) && (
+        <ErrorDisplay error={approveError ?? redeemError} onDismiss={() => { resetApprove(); resetRedeem(); }} />
+      )}
+
+      {/* Success */}
+      {redeemEvent && redeemStatus === "success" && (
+        <div className="flex items-center gap-3 rounded-lg bg-[var(--success)]/8 px-4 py-3">
+          <svg className="h-5 w-5 flex-shrink-0 text-[var(--success)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          <div>
+            <p className="text-sm font-medium text-[var(--success)]">Redemption successful</p>
+            <p className="text-xs text-[var(--text-muted)]">
+              Received {formatTokenAmount(redeemEvent.outputAmount, outputDecimals)} {outputToken}
+              {dustEvents.length > 0 && " (dust returned)"}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Action button */}
+      {!showStepper && (
+        <button onClick={handleSubmit} disabled={buttonDisabled || isInProgress} className="btn-primary w-full" data-testid="redeem-button">
+          {buttonLabel}
+        </button>
+      )}
+    </div>
+  );
+}
