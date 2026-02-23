@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateToken, validateAmount, validateShares, applySlippage } from "@/lib/validation";
+import { validateToken, validateAmount, validateShares, applySlippage, calculateSlippageBps } from "@/lib/validation";
 import type { TokenInfo } from "@/types";
 
 const USDC: TokenInfo = {
@@ -133,5 +133,19 @@ describe("applySlippage", () => {
   it("throws on invalid slippage", () => {
     expect(() => applySlippage(1000n, -1)).toThrow();
     expect(() => applySlippage(1000n, 10001)).toThrow();
+  });
+});
+
+describe("calculateSlippageBps", () => {
+  it("returns 0 bps at parity", () => {
+    expect(calculateSlippageBps(100_000n, 100_000n)).toBe(0);
+  });
+
+  it("returns 100 bps for 1% worse quote", () => {
+    expect(calculateSlippageBps(100_000n, 99_000n)).toBe(100);
+  });
+
+  it("returns 0 when quote is better than expected", () => {
+    expect(calculateSlippageBps(100_000n, 101_000n)).toBe(0);
   });
 });

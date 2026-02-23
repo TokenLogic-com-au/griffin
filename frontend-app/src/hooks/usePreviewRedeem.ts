@@ -4,6 +4,7 @@ import { useReadContract } from "wagmi";
 import { gsmRouterAbi } from "@/abi/gsmRouter";
 import { erc4626Abi } from "@/abi/erc4626";
 import { addresses, getGsmForToken } from "@/config/addresses";
+import { calculateSlippageBps } from "@/lib/validation";
 import type { Address } from "viem";
 import type { RedeemPreview } from "@/types";
 
@@ -59,17 +60,13 @@ export function usePreviewRedeem(
     ? (gsmPreview.data as [bigint, bigint])[1]
     : 0n;
 
-  // Compute price impact
+  // Compute quote slippage vs 1:1 baseline.
   let priceImpactBps = 0;
   if (ghoAmount && estimatedOutput && !isGHO && ghoAmount > 0n) {
     // ghoAmount is 18-dec, estimatedOutput is 6-dec
     // Normalize estimatedOutput to 18-dec for comparison
     const normalized = estimatedOutput * 10n ** 12n;
-    if (ghoAmount > 0n) {
-      const diff =
-        ghoAmount > normalized ? ghoAmount - normalized : normalized - ghoAmount;
-      priceImpactBps = Number((diff * 10000n) / ghoAmount);
-    }
+    priceImpactBps = calculateSlippageBps(ghoAmount, normalized);
   }
 
   const isLoading = redeemPreview.isLoading || gsmPreview.isLoading;

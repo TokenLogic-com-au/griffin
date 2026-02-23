@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useSyncExternalStore } from "react";
 
 /**
  * Returns true only after the component has mounted on the client.
@@ -8,7 +8,9 @@ import { useState, useEffect } from "react";
  * (wallet connection, window, etc.) to avoid SSR hydration mismatches.
  */
 export function useMounted(): boolean {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  return mounted;
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 }

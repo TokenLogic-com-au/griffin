@@ -15,8 +15,8 @@ import { usePreviewDeposit } from "@/hooks/usePreviewDeposit";
 import { useApprove } from "@/hooks/useApprove";
 import { useDeposit } from "@/hooks/useDeposit";
 
-import { getTokenBySymbol, DEFAULT_SLIPPAGE_BPS } from "@/config/tokens";
-import { validateAmount, applySlippage } from "@/lib/validation";
+import { getTokenBySymbol } from "@/config/tokens";
+import { validateAmount } from "@/lib/validation";
 import { formatTokenAmount } from "@/lib/formatting";
 import { trackEvent } from "@/lib/analytics";
 import type { SupportedToken, TransactionStep } from "@/types";
@@ -24,8 +24,6 @@ import type { SupportedToken, TransactionStep } from "@/types";
 export function DepositForm() {
   const [selectedToken, setSelectedToken] = useState<SupportedToken>("GHO");
   const [amountStr, setAmountStr] = useState("");
-  const [slippageBps, setSlippageBps] = useState(DEFAULT_SLIPPAGE_BPS);
-  const [showSettings, setShowSettings] = useState(false);
 
   const token = getTokenBySymbol(selectedToken);
   const { balances, refetch: refetchBalances } = useTokenBalances();
@@ -98,25 +96,32 @@ export function DepositForm() {
 
   const isInProgress = ["pending", "confirming"].includes(approveStatus) || ["pending", "confirming"].includes(depositStatus);
   const awaitingDepositAction = approveStatus === "success" && depositStatus === "idle";
-
-  const getMinOutputAmount = useCallback(
-    (inputAmount: bigint) =>
-      applySlippage(
-        selectedToken === "GHO" ? inputAmount : (preview?.ghoAmount ?? 0n),
-        slippageBps
-      ),
-    [selectedToken, preview, slippageBps]
-  );
+  const requiresPreview = selectedToken !== "GHO";
+  const previewReady = !requiresPreview || !!preview;
 
   const handleSubmit = useCallback(() => {
     if (!parsedAmount || !validation.valid) return;
-    const minOutput = getMinOutputAmount(parsedAmount);
+    let quotedGhoAmount = parsedAmount;
+    if (selectedToken !== "GHO") {
+      if (!preview) return;
+      quotedGhoAmount = preview.ghoAmount;
+    }
     if (needsApproval && approveStatus === "idle") {
       approve(token.address, parsedAmount, selectedToken);
     } else {
-      deposit(token.address, parsedAmount, minOutput, selectedToken);
+      deposit(token.address, parsedAmount, quotedGhoAmount, selectedToken);
     }
-  }, [parsedAmount, validation.valid, needsApproval, approveStatus, approve, selectedToken, token.address, deposit, getMinOutputAmount]);
+  }, [
+    parsedAmount,
+    validation.valid,
+    preview,
+    selectedToken,
+    needsApproval,
+    approveStatus,
+    approve,
+    token.address,
+    deposit,
+  ]);
 
   const handleReset = () => { resetApprove(); resetDeposit(); setAmountStr(""); };
 
@@ -124,6 +129,7 @@ export function DepositForm() {
   let buttonDisabled = true;
   if (!amountStr) { buttonLabel = "Enter an amount"; }
   else if (!validation.valid) { buttonLabel = validation.error ?? "Invalid input"; }
+  else if (!previewReady) { buttonLabel = "Fetching quote..."; }
   else if (isInProgress) { buttonLabel = "Processing..."; }
   else if (awaitingDepositAction) { buttonLabel = "Deposit"; buttonDisabled = false; }
   else if (previewLoading) { buttonLabel = needsApproval ? "Approve & Deposit" : "Deposit"; buttonDisabled = false; }
@@ -153,46 +159,11 @@ export function DepositForm() {
         }
       />
 
-      {/* Settings row */}
-      <div className="flex items-center justify-between px-1">
-        <button
-          type="button"
-          onClick={() => setShowSettings(!showSettings)}
-          className="flex items-center gap-1 text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text-secondary)]"
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.066z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          Slippage {(slippageBps / 100).toFixed(1)}%
-        </button>
-      </div>
-      {showSettings && (
-        <div className="flex gap-1.5 px-1">
-          {[10, 50, 100, 200].map((bps) => (
-            <button
-              key={bps}
-              type="button"
-              onClick={() => setSlippageBps(bps)}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                slippageBps === bps
-                  ? "bg-[var(--aave-teal)]/15 text-[var(--aave-teal)]"
-                  : "bg-[var(--bg-surface)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-              }`}
-            >
-              {(bps / 100).toFixed(1)}%
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* Preview */}
       {parsedAmount && parsedAmount > 0n && (
         <TransactionPreview
           type="deposit"
           preview={preview}
-          inputToken={selectedToken}
-          slippageBps={slippageBps}
         />
       )}
 

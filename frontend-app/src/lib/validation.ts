@@ -124,3 +124,12 @@ export function applySlippage(estimatedOutput: bigint, slippageBps: number): big
   }
   return estimatedOutput - (estimatedOutput * BigInt(slippageBps)) / 10000n;
 }
+
+/**
+ * Compute quote slippage bps from expected vs actual output.
+ * If the quote is better than expected, slippage is 0.
+ */
+export function calculateSlippageBps(expectedOutput: bigint, actualOutput: bigint): number {
+  if (expectedOutput <= 0n || actualOutput >= expectedOutput) return 0;
+  return Number(((expectedOutput - actualOutput) * 10000n) / expectedOutput);
+}

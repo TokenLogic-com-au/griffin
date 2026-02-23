@@ -6,15 +6,12 @@ import type { DepositPreview, RedeemPreview, SupportedToken } from "@/types";
 interface DepositPreviewProps {
   type: "deposit";
   preview: DepositPreview | undefined;
-  inputToken: SupportedToken;
-  slippageBps: number;
 }
 
 interface RedeemPreviewProps {
   type: "redeem";
   preview: RedeemPreview | undefined;
   outputToken: SupportedToken;
-  slippageBps: number;
 }
 
 type TransactionPreviewProps = DepositPreviewProps | RedeemPreviewProps;
@@ -27,7 +24,7 @@ export function TransactionPreview(props: TransactionPreviewProps) {
   return <RedeemRows {...props} />;
 }
 
-function DepositRows({ preview, slippageBps }: DepositPreviewProps) {
+function DepositRows({ preview }: DepositPreviewProps) {
   if (!preview) return null;
   const showImpact = preview.priceImpactBps > 100;
 
@@ -42,13 +39,13 @@ function DepositRows({ preview, slippageBps }: DepositPreviewProps) {
       {preview.fee > 0n && (
         <DetailRow label="GSM fee" value={formatFee(preview.fee, 18, "GHO")} />
       )}
-      <DetailRow label="Max slippage" value={formatBps(slippageBps)} />
+      <DetailRow label="Quote slippage" value={formatBps(preview.priceImpactBps)} />
       {showImpact && <PriceImpactWarning bps={preview.priceImpactBps} />}
     </div>
   );
 }
 
-function RedeemRows({ preview, outputToken, slippageBps }: RedeemPreviewProps) {
+function RedeemRows({ preview, outputToken }: RedeemPreviewProps) {
   if (!preview) return null;
   const outDec = outputToken === "GHO" ? 18 : 6;
   const showImpact = preview.priceImpactBps > 100;
@@ -64,7 +61,7 @@ function RedeemRows({ preview, outputToken, slippageBps }: RedeemPreviewProps) {
       {preview.fee > 0n && (
         <DetailRow label="GSM fee" value={formatFee(preview.fee, 18, "GHO")} />
       )}
-      <DetailRow label="Max slippage" value={formatBps(slippageBps)} />
+      <DetailRow label="Quote slippage" value={formatBps(preview.priceImpactBps)} />
       {showImpact && <PriceImpactWarning bps={preview.priceImpactBps} />}
     </div>
   );

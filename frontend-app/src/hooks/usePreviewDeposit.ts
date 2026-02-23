@@ -4,6 +4,7 @@ import { useReadContract } from "wagmi";
 import { gsmRouterAbi } from "@/abi/gsmRouter";
 import { erc4626Abi } from "@/abi/erc4626";
 import { addresses, getGsmForToken } from "@/config/addresses";
+import { calculateSlippageBps } from "@/lib/validation";
 import type { Address } from "viem";
 import type { DepositPreview } from "@/types";
 
@@ -57,16 +58,13 @@ export function usePreviewDeposit(
 
   const estimatedShares = (sharesPreview.data as bigint) ?? undefined;
 
-  // Compute price impact (approximate: based on 1:1 expectation for stablecoins)
+  // Compute quote slippage vs 1:1 expectation for stablecoins.
   let priceImpactBps = 0;
   if (amount && ghoAmount && !isGHO && amount > 0n) {
-    // Compare: we put in `amount` (6-dec stablecoin) and get `ghoAmount` (18-dec GHO)
-    // Normalize: amount * 10^12 should equal ghoAmount for 1:1
+    // Compare: amount (6-dec stablecoin) to ghoAmount (18-dec GHO)
+    // Normalize amount to 18 decimals for a 1:1 baseline.
     const normalized = amount * 10n ** 12n;
-    if (normalized > 0n) {
-      const diff = normalized > ghoAmount ? normalized - ghoAmount : ghoAmount - normalized;
-      priceImpactBps = Number((diff * 10000n) / normalized);
-    }
+    priceImpactBps = calculateSlippageBps(normalized, ghoAmount);
   }
 
   const isLoading = gsmPreview.isLoading || sharesPreview.isLoading;

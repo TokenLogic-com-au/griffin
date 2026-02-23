@@ -41,18 +41,16 @@ export default function Home() {
             <div className="flex items-center gap-1">
               <AaveGhost className="h-7 w-7" />
               <div className="ml-4 flex items-center gap-1">
-                <NavTab active label="sGHO Router" badge="APY" />
-                <NavTab label="Markets" />
-                <NavTab label="Swap" />
+                <NavTab active label="sGHO Router" />
+                <a
+                  href="/dashboard"
+                  className="rounded-md px-3 py-1.5 text-sm font-semibold text-[var(--text-muted)] transition-colors hover:text-[var(--text-secondary)]"
+                >
+                  Dashboard
+                </a>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <a
-                href="/dashboard"
-                className="hidden rounded-md border border-[var(--border-primary)] bg-[var(--bg-surface)] px-3 py-1.5 text-xs font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text-secondary)] sm:block"
-              >
-                Dashboard
-              </a>
               <a
                 href="https://docs.aave.com/developers/getting-started/readme"
                 target="_blank"

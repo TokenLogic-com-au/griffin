@@ -8,6 +8,8 @@ import { test, expect } from "@playwright/test";
 test.describe("Redeem Flow - UI", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
+    await page.locator(".hero-card").getByRole("button", { name: "Withdraw", exact: true }).click();
+    await expect(page.getByTestId("tab-redeem")).toBeVisible();
     await page.getByTestId("tab-redeem").click();
   });
 
@@ -17,12 +19,11 @@ test.describe("Redeem Flow - UI", () => {
   });
 
   test("shows connect wallet prompt", async ({ page }) => {
-    await expect(page.getByText("Connect your wallet to get started")).toBeVisible();
+    await expect(page.getByText("Connect a wallet to get started")).toBeVisible();
   });
 
-  test("how it works shows redeem steps", async ({ page }) => {
-    await expect(page.getByText("Enter the amount of sGHO shares")).toBeVisible();
-    await expect(page.getByText("Choose your desired output token")).toBeVisible();
+  test("shows disconnected state content for redeem", async ({ page }) => {
+    await expect(page.getByText("Connect a wallet to get started")).toBeVisible();
   });
 });
 

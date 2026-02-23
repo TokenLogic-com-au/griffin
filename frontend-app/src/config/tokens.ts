@@ -39,6 +39,3 @@ export function getTokenByAddress(address: Address): TokenInfo | undefined {
 export function getTokenBySymbol(symbol: SupportedToken): TokenInfo {
   return TOKENS[symbol];
 }
-
-/** Default slippage tolerance in basis points */
-export const DEFAULT_SLIPPAGE_BPS = 50; // 0.5%

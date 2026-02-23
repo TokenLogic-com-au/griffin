@@ -10,6 +10,8 @@ import { test, expect } from "@playwright/test";
 test.describe("Deposit Flow - UI", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
+    await page.locator(".hero-card").getByRole("button", { name: "Deposit", exact: true }).click();
+    await expect(page.getByTestId("tab-deposit")).toBeVisible();
   });
 
   test("renders deposit tab by default", async ({ page }) => {
@@ -20,7 +22,7 @@ test.describe("Deposit Flow - UI", () => {
   });
 
   test("shows connect wallet prompt when not connected", async ({ page }) => {
-    await expect(page.getByText("Connect your wallet to get started")).toBeVisible();
+    await expect(page.getByText("Connect a wallet to get started")).toBeVisible();
   });
 
   test("can switch between deposit and redeem tabs", async ({ page }) => {
@@ -32,14 +34,13 @@ test.describe("Deposit Flow - UI", () => {
     await expect(depositTab).toHaveClass(/tab-inactive/);
   });
 
-  test("shows how it works section for deposit", async ({ page }) => {
-    await expect(page.getByText("How it works")).toBeVisible();
-    await expect(page.getByText("Choose your input token")).toBeVisible();
+  test("shows disconnected state content for deposit", async ({ page }) => {
+    await expect(page.getByText("Connect a wallet to get started")).toBeVisible();
   });
 
-  test("shows how it works section for redeem", async ({ page }) => {
+  test("shows disconnected state content for redeem", async ({ page }) => {
     await page.getByTestId("tab-redeem").click();
-    await expect(page.getByText("Enter the amount of sGHO shares")).toBeVisible();
+    await expect(page.getByText("Connect a wallet to get started")).toBeVisible();
   });
 
   test("page has correct title", async ({ page }) => {
@@ -47,7 +48,7 @@ test.describe("Deposit Flow - UI", () => {
   });
 
   test("header displays app name", async ({ page }) => {
-    await expect(page.getByText("sGHO Router")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "sGHO Router" })).toBeVisible();
   });
 });
 

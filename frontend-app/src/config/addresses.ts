@@ -1,8 +1,41 @@
 import type { Address } from "viem";
 
-function envAddress(key: string, fallback: Address): Address {
-  const val = process.env[key];
+const RAW_ENV = {
+  NEXT_PUBLIC_SGHO_ROUTER_ADDRESS: process.env.NEXT_PUBLIC_SGHO_ROUTER_ADDRESS,
+  NEXT_PUBLIC_GSM_ROUTER_ADDRESS: process.env.NEXT_PUBLIC_GSM_ROUTER_ADDRESS,
+  NEXT_PUBLIC_SGHO_ADDRESS: process.env.NEXT_PUBLIC_SGHO_ADDRESS,
+  NEXT_PUBLIC_GHO_ADDRESS: process.env.NEXT_PUBLIC_GHO_ADDRESS,
+  NEXT_PUBLIC_USDC_ADDRESS: process.env.NEXT_PUBLIC_USDC_ADDRESS,
+  NEXT_PUBLIC_USDT_ADDRESS: process.env.NEXT_PUBLIC_USDT_ADDRESS,
+  NEXT_PUBLIC_GSM_USDC_ADDRESS: process.env.NEXT_PUBLIC_GSM_USDC_ADDRESS,
+  NEXT_PUBLIC_GSM_USDT_ADDRESS: process.env.NEXT_PUBLIC_GSM_USDT_ADDRESS,
+} as const;
+
+function normalizeAddress(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (
+    (trimmed.startsWith("\"") && trimmed.endsWith("\"")) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
+function envAddress(
+  key: keyof typeof RAW_ENV,
+  fallback: Address,
+  required = false
+): Address {
+  const val = normalizeAddress(RAW_ENV[key]);
   if (val && /^0x[0-9a-fA-F]{40}$/.test(val)) return val as Address;
+  if (required) {
+    throw new Error(
+      `Missing or invalid ${key}. Set a 42-char 0x-prefixed address in your environment.`
+    );
+  }
   return fallback;
 }
 
@@ -10,15 +43,18 @@ function envAddress(key: string, fallback: Address): Address {
 export const addresses = {
   sGHORouter: envAddress(
     "NEXT_PUBLIC_SGHO_ROUTER_ADDRESS",
-    "0x0000000000000000000000000000000000000000" as Address
+    "0x0000000000000000000000000000000000000000" as Address,
+    true
   ),
   gsmRouter: envAddress(
     "NEXT_PUBLIC_GSM_ROUTER_ADDRESS",
-    "0x0000000000000000000000000000000000000000" as Address
+    "0x0000000000000000000000000000000000000000" as Address,
+    true
   ),
   sGHO: envAddress(
     "NEXT_PUBLIC_SGHO_ADDRESS",
-    "0x0000000000000000000000000000000000000000" as Address
+    "0x0000000000000000000000000000000000000000" as Address,
+    true
   ),
   GHO: envAddress(
     "NEXT_PUBLIC_GHO_ADDRESS",

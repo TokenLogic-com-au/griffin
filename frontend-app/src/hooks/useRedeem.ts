@@ -8,6 +8,7 @@ import {
 import { useCallback, useState } from "react";
 import { sGHORouterAbi } from "@/abi/sGHORouter";
 import { addresses } from "@/config/addresses";
+import { targetChain } from "@/config/chains";
 import { parseError } from "@/lib/errors";
 import { trackEvent } from "@/lib/analytics";
 import type { Address } from "viem";
@@ -50,10 +51,12 @@ export function useRedeem() {
     error: receiptError,
   } = useWaitForTransactionReceipt({
     hash: txHash,
+    chainId: targetChain.id,
   });
 
   // Watch for Redeemed event
   useWatchContractEvent({
+    chainId: targetChain.id,
     address: addresses.sGHORouter,
     abi: sGHORouterAbi,
     eventName: "Redeemed",
@@ -70,6 +73,7 @@ export function useRedeem() {
 
   // Watch for DustReturned event
   useWatchContractEvent({
+    chainId: targetChain.id,
     address: addresses.sGHORouter,
     abi: sGHORouterAbi,
     eventName: "DustReturned",
@@ -97,6 +101,7 @@ export function useRedeem() {
       trackEvent({ type: "redeem_started", token: tokenSymbol, shares: shares.toString() });
 
       writeContract({
+        chainId: targetChain.id,
         address: addresses.sGHORouter,
         abi: sGHORouterAbi,
         functionName: "redeem",
