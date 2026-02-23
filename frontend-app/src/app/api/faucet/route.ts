@@ -6,6 +6,7 @@ import {
   dripUSDC,
   dripUSDT,
   dripGHO,
+  isFaucetEnabled,
   type FaucetResult,
   type FaucetToken,
 } from "@/lib/faucet";
@@ -52,8 +53,8 @@ export async function POST(request: Request) {
     return badRequest("Invalid recipient address.");
   }
 
-  if (process.env.NEXT_PUBLIC_CHAIN_ID !== "31337") {
-    return badRequest("Faucet is only available on chain 31337.", 403);
+  if (!isFaucetEnabled()) {
+    return badRequest("Faucet is only available on configured fork networks.", 403);
   }
 
   try {

@@ -97,6 +97,7 @@ export function DepositForm() {
   }, [needsApproval, approveStatus, approveTxHash, approveError, depositStatus, depositTxHash, depositError, selectedToken]);
 
   const isInProgress = ["pending", "confirming"].includes(approveStatus) || ["pending", "confirming"].includes(depositStatus);
+  const awaitingDepositAction = approveStatus === "success" && depositStatus === "idle";
 
   const getMinOutputAmount = useCallback(
     (inputAmount: bigint) =>
@@ -110,19 +111,12 @@ export function DepositForm() {
   const handleSubmit = useCallback(() => {
     if (!parsedAmount || !validation.valid) return;
     const minOutput = getMinOutputAmount(parsedAmount);
-    if (needsApproval) {
+    if (needsApproval && approveStatus === "idle") {
       approve(token.address, parsedAmount, selectedToken);
     } else {
       deposit(token.address, parsedAmount, minOutput, selectedToken);
     }
-  }, [parsedAmount, validation.valid, needsApproval, approve, selectedToken, token.address, deposit, getMinOutputAmount]);
-
-  useEffect(() => {
-    if (approveStatus === "success" && depositStatus === "idle" && parsedAmount) {
-      const minOutput = getMinOutputAmount(parsedAmount);
-      deposit(token.address, parsedAmount, minOutput, selectedToken);
-    }
-  }, [approveStatus, depositStatus, parsedAmount, selectedToken, deposit, token.address, getMinOutputAmount]);
+  }, [parsedAmount, validation.valid, needsApproval, approveStatus, approve, selectedToken, token.address, deposit, getMinOutputAmount]);
 
   const handleReset = () => { resetApprove(); resetDeposit(); setAmountStr(""); };
 
@@ -131,11 +125,13 @@ export function DepositForm() {
   if (!amountStr) { buttonLabel = "Enter an amount"; }
   else if (!validation.valid) { buttonLabel = validation.error ?? "Invalid input"; }
   else if (isInProgress) { buttonLabel = "Processing..."; }
+  else if (awaitingDepositAction) { buttonLabel = "Deposit"; buttonDisabled = false; }
   else if (previewLoading) { buttonLabel = needsApproval ? "Approve & Deposit" : "Deposit"; buttonDisabled = false; }
   else if (needsApproval) { buttonLabel = `Approve & Deposit`; buttonDisabled = false; }
   else if (validation.valid) { buttonLabel = "Deposit"; buttonDisabled = false; }
 
   const showStepper = approveStatus !== "idle" || depositStatus !== "idle";
+  const showActionButton = !showStepper || awaitingDepositAction;
 
   return (
     <div className="space-y-5">
@@ -203,6 +199,12 @@ export function DepositForm() {
       {/* Stepper */}
       {showStepper && <TransactionStatus steps={steps} onReset={handleReset} />}
 
+      {awaitingDepositAction && (
+        <p className="px-1 text-xs text-[var(--text-muted)]">
+          Approval confirmed. Click Deposit to submit the sGHORouter transaction.
+        </p>
+      )}
+
       {/* Errors */}
       {!showStepper && (approveError || depositError) && (
         <ErrorDisplay error={approveError ?? depositError} onDismiss={() => { resetApprove(); resetDeposit(); }} />
@@ -225,7 +227,7 @@ export function DepositForm() {
       )}
 
       {/* Action button */}
-      {!showStepper && (
+      {showActionButton && (
         <button
           onClick={handleSubmit}
           disabled={buttonDisabled || isInProgress}

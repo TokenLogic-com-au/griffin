@@ -67,8 +67,13 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_USDT_ADDRESS` | USDT token address | Has mainnet default |
 | `NEXT_PUBLIC_GSM_USDC_ADDRESS` | GSM USDC address | Has mainnet default |
 | `NEXT_PUBLIC_GSM_USDT_ADDRESS` | GSM USDT address | Has mainnet default |
-| `NEXT_PUBLIC_CHAIN_ID` | Target chain ID (1 = mainnet, 31337 = Anvil) | Default: 1 |
+| `NEXT_PUBLIC_CHAIN_ID` | Target chain ID (1 = mainnet, 31337 = Anvil, non-1 required for Tenderly VNet) | Default: 1 |
 | `NEXT_PUBLIC_ANVIL_RPC_URL` | Anvil fork RPC URL | For local dev |
+| `NEXT_PUBLIC_TENDERLY_VNET_ENABLED` | Enable native Tenderly custom chain config | Optional |
+| `NEXT_PUBLIC_TENDERLY_RPC_URL` | Tenderly VNet public RPC URL | For Tenderly dev |
+| `NEXT_PUBLIC_TENDERLY_CHAIN_NAME` | Wallet label for Tenderly chain | Optional |
+| `NEXT_PUBLIC_TENDERLY_EXPLORER_URL` | Tenderly explorer URL for the VNet | Optional |
+| `TENDERLY_ADMIN_RPC_URL` | Tenderly Admin RPC URL (used by `/api/faucet`) | For Tenderly faucet |
 
 ### Local Development with Anvil Fork
 
@@ -94,6 +99,37 @@ npm run dev
 ```
 
 5. Open http://localhost:3000 and connect MetaMask to `localhost:8545`.
+
+### Development with Tenderly Virtual TestNet
+
+1. Create a Tenderly Virtual TestNet fork and copy:
+   - Public RPC URL
+   - Admin RPC URL
+   - Chain ID
+
+2. Set env vars:
+
+```bash
+NEXT_PUBLIC_CHAIN_ID=<TENDERLY_CHAIN_ID>
+NEXT_PUBLIC_TENDERLY_VNET_ENABLED=true
+NEXT_PUBLIC_TENDERLY_RPC_URL=<TENDERLY_PUBLIC_RPC_URL>
+TENDERLY_ADMIN_RPC_URL=<TENDERLY_ADMIN_RPC_URL>
+```
+
+`NEXT_PUBLIC_CHAIN_ID` must not be `1` in Tenderly mode. Using chain ID `1` can route wallet writes to real Ethereum mainnet.
+
+3. Deploy contracts to Tenderly RPC and set:
+   - `NEXT_PUBLIC_GSM_ROUTER_ADDRESS`
+   - `NEXT_PUBLIC_SGHO_ROUTER_ADDRESS`
+   - `NEXT_PUBLIC_SGHO_ADDRESS`
+
+4. Start the app:
+
+```bash
+npm run dev
+```
+
+The in-app faucet will use Tenderly Admin RPC (`tenderly_setBalance` and `tenderly_setErc20Balance`) when Tenderly mode is enabled.
 
 ### Production
 

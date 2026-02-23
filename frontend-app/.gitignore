@@ -37,3 +37,4 @@ playwright-report/
 # Misc
 *.tsbuildinfo
 next-env.d.ts
+.vercel

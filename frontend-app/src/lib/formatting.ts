@@ -47,9 +47,18 @@ export function formatFee(fee: bigint, decimals: number, symbol: string): string
 }
 
 /**
- * Build an Etherscan transaction URL.
+ * Build a transaction URL from the active explorer configuration.
  */
-export function getTxUrl(txHash: string, chainId: number = 1): string {
+export function getTxUrl(
+  txHash: string,
+  chainId: number = 1,
+  explorerUrl?: string
+): string {
+  if (explorerUrl) {
+    const baseUrl = explorerUrl.replace(/\/+$/, "");
+    return `${baseUrl}/tx/${txHash}`;
+  }
+
   if (chainId === 1) {
     return `https://etherscan.io/tx/${txHash}`;
   }
@@ -57,9 +66,18 @@ export function getTxUrl(txHash: string, chainId: number = 1): string {
 }
 
 /**
- * Build an Etherscan address URL.
+ * Build an address URL from the active explorer configuration.
  */
-export function getAddressUrl(address: string, chainId: number = 1): string {
+export function getAddressUrl(
+  address: string,
+  chainId: number = 1,
+  explorerUrl?: string
+): string {
+  if (explorerUrl) {
+    const baseUrl = explorerUrl.replace(/\/+$/, "");
+    return `${baseUrl}/address/${address}`;
+  }
+
   if (chainId === 1) {
     return `https://etherscan.io/address/${address}`;
   }

@@ -3,6 +3,7 @@
 import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { erc20Abi } from "@/abi/erc20";
 import { addresses } from "@/config/addresses";
+import { targetChain } from "@/config/chains";
 import { parseError } from "@/lib/errors";
 import { trackEvent } from "@/lib/analytics";
 import type { Address } from "viem";
@@ -29,11 +30,13 @@ export function useApprove() {
     error: receiptError,
   } = useWaitForTransactionReceipt({
     hash: txHash,
+    chainId: targetChain.id,
   });
 
   const approve = async (tokenAddress: Address, amount: bigint, tokenSymbol?: SupportedToken) => {
     try {
       writeContract({
+        chainId: targetChain.id,
         address: tokenAddress,
         abi: erc20Abi,
         functionName: "approve",

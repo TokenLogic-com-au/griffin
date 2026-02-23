@@ -2,7 +2,7 @@
 
 import type { TransactionStep } from "@/types";
 import { getTxUrl } from "@/lib/formatting";
-import { useAccount } from "wagmi";
+import { targetChain } from "@/config/chains";
 
 interface TransactionStatusProps {
   steps: TransactionStep[];
@@ -13,9 +13,6 @@ interface TransactionStatusProps {
  * Aave-style multi-step transaction progress.
  */
 export function TransactionStatus({ steps, onReset }: TransactionStatusProps) {
-  const { chain } = useAccount();
-  const chainId = chain?.id ?? 1;
-
   const allDone = steps.every((s) => s.status === "success");
   const hasError = steps.some((s) => s.status === "error");
 
@@ -34,7 +31,11 @@ export function TransactionStatus({ steps, onReset }: TransactionStatusProps) {
             </div>
             {step.txHash && (
               <a
-                href={getTxUrl(step.txHash, chainId)}
+                href={getTxUrl(
+                  step.txHash,
+                  targetChain.id,
+                  targetChain.blockExplorers?.default.url
+                )}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-[var(--aave-teal)] hover:underline"

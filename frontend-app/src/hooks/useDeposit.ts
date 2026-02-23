@@ -8,6 +8,7 @@ import {
 import { useCallback, useState } from "react";
 import { sGHORouterAbi } from "@/abi/sGHORouter";
 import { addresses } from "@/config/addresses";
+import { targetChain } from "@/config/chains";
 import { parseError } from "@/lib/errors";
 import { trackEvent } from "@/lib/analytics";
 import type { Address } from "viem";
@@ -51,10 +52,12 @@ export function useDeposit() {
     error: receiptError,
   } = useWaitForTransactionReceipt({
     hash: txHash,
+    chainId: targetChain.id,
   });
 
   // Watch for Deposited event
   useWatchContractEvent({
+    chainId: targetChain.id,
     address: addresses.sGHORouter,
     abi: sGHORouterAbi,
     eventName: "Deposited",
@@ -71,6 +74,7 @@ export function useDeposit() {
 
   // Watch for DustReturned event
   useWatchContractEvent({
+    chainId: targetChain.id,
     address: addresses.sGHORouter,
     abi: sGHORouterAbi,
     eventName: "DustReturned",
@@ -98,6 +102,7 @@ export function useDeposit() {
       trackEvent({ type: "deposit_started", token: tokenSymbol, amount: amount.toString() });
 
       writeContract({
+        chainId: targetChain.id,
         address: addresses.sGHORouter,
         abi: sGHORouterAbi,
         functionName: "deposit",

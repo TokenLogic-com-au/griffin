@@ -2,7 +2,7 @@
 
 import { useAccount } from "wagmi";
 import { useFaucet } from "@/hooks/useFaucet";
-import { targetChain } from "@/config/chains";
+import { isDevForkChain, isTenderlyVirtualTestNet } from "@/config/chains";
 import type { FaucetToken } from "@/lib/faucet";
 
 const TOKEN_BUTTONS: { token: FaucetToken | "all"; label: string; amount: string }[] = [
@@ -14,16 +14,17 @@ const TOKEN_BUTTONS: { token: FaucetToken | "all"; label: string; amount: string
 ];
 
 /**
- * Dev-only faucet panel for Anvil fork.
+ * Dev-only faucet panel for fork networks.
  */
 export function FaucetPanel() {
   const { isConnected } = useAccount();
   const { drip, status, results, currentToken, reset } = useFaucet();
 
-  if (targetChain.id !== 31337) return null;
+  if (!isDevForkChain) return null;
   if (!isConnected) return null;
 
   const isDripping = status === "dripping";
+  const faucetBackendLabel = isTenderlyVirtualTestNet ? "Tenderly" : "Anvil";
 
   return (
     <div className="rounded-lg border border-dashed border-[var(--warning)]/30 bg-[var(--bg-secondary)] p-5">
@@ -33,14 +34,16 @@ export function FaucetPanel() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
           </svg>
         </div>
-        <h3 className="text-sm font-semibold text-[var(--warning)]">Local Faucet</h3>
+        <h3 className="text-sm font-semibold text-[var(--warning)]">Dev Faucet</h3>
         <span className="rounded bg-[var(--warning)]/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--warning)]">
-          Dev
+          {faucetBackendLabel}
         </span>
       </div>
 
       <p className="mb-4 text-xs text-[var(--text-muted)]">
-        Drip test tokens via Anvil impersonation (mainnet fork required).
+        {isTenderlyVirtualTestNet
+          ? "Drip test tokens via Tenderly Admin RPC."
+          : "Drip test tokens via Anvil impersonation (mainnet fork required)."}
       </p>
 
       <div className="space-y-1.5">
