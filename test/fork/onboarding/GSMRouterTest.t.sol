@@ -9,7 +9,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {GSMRouter} from "src/contracts/onboarding/GSMRouter.sol";
 import {IGSMRouter} from "src/interfaces/onboarding/IGSMRouter.sol";
 import {IGSM} from "src/interfaces/IGSM.sol";
-import {sGHO} from "test/mocks/sGHO.sol";
+import {sGHO} from "test/mocks/sGho.sol";
 
 /**
  * @title GSMRouterTest
