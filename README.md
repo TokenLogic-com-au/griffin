@@ -1,197 +1,145 @@
 # GHO Router for GSM
 
-A smart contract that simplifies swapping USDC/USDT to GHO in a single transaction for the [GSM Frontend](https://app.gsm.tokenlogic.xyz/).
+A smart contract that simplifies swapping USDC/USDT to GHO or sGHO in a single transaction for the [GSM Frontend](https://app.gsm.tokenlogic.xyz/).
 
-## Problem Statement
+- `USDC/USDT -> GHO`
+- `GHO -> USDC/USDT`
+- `USDC/USDT/GHO -> sGHO`
 
-Currently, users need to perform multiple manual steps:
-1. Convert USDC to stataUSDC (no frontend exists)
-2. Convert stataUSDC to GHO via GSM
+The contract lives at:
 
-This creates friction because:
-- stataTokens are not well-known
-- Users need multiple transactions
-- Complex approval management required
+- `src/contracts/onboarding/GSMRouter.sol`
 
-## Solution
+## Why this exists
 
-GHO router provides a single-transaction flow that handles all the complexity:
+Using GSM routes directly requires users/integrators to handle:
 
-```
-USDC/USDT → [Router] → GHO
-```
+- wrapping/unwrapping through static aToken vaults
+- GSM buy/sell semantics
+- approval edge cases (notably USDT-style approvals)
+- residual token handling on partial consumption
 
-### Key Features
+`GSMRouter` handles these mechanics and returns outputs directly to the caller.
 
-- ✅ **Single Transaction**: All steps bundled into one call
-- ✅ **Exact Approvals**: Never requests unlimited approvals
-- ✅ **No Fund Storage**: Contract never holds user funds
-- ✅ **Slippage Protection**: Built-in protection against unfavorable swaps
-- ✅ **Bidirectional**: Supports both deposit and withdrawal flows
+## Key behavior
 
-## Architecture
+- Immutable route wiring at deploy time (`GSM_USDC`, `GSM_USDT`, `GHO`, `sGHO`)
+- Constructor validation of route compatibility
+- Slippage gates on all write paths
+- Dust return events on partial consumption
+- Exact approvals with `forceApprove(..., 0)` cleanup
+- Preview methods for quote UX
 
-### Forward Flow: USDC/USDT → GHO
+## Public API
 
-1. User approves exact amount to GHO Router
-2. Router receives tokens
-3. Router wraps tokens → stataTokens (ERC4626) which supplies to Aave V3 Pool
-4. Router approves exact stataTokens to GSM
-5. Router calls GSM.sellAsset() → receives GHO
-6. Router transfers GHO to user
+- `swapToGHO(address token, uint256 amount, uint256 minGHOAmount) -> uint256`
+- `swapFromGHO(address token, uint256 ghoAmount, uint256 minOutputAmount) -> uint256`
+- `swapTosGHO(address token, uint256 amount, uint256 minOut) -> uint256`
+- `swapFromsGHO(address token, uint256 amount, uint256 minOut) -> uint256`
+- `previewSwapToGHO(address token, uint256 amount) -> (uint256 ghoAmount, uint256 fee)`
+- `previewSwapFromGHO(address token, uint256 ghoAmount) -> (uint256 assetAmount, uint256 fee)`
+- `previewSwapFromsGHO(address token, uint256 amount) -> (uint256 outputAmount, uint256 fee)`
+- `rescueToken(address token, address to, uint256 amount)` (`onlyOwner`)
 
-### Reverse Flow: GHO → USDC/USDT
+See interface for events/errors:
 
-1. User approves exact GHO to GHO Router
-2. Router receives GHO
-3. Router calls GSM.buyAsset() → receives stataTokens
-4. Router unwraps stataTokens → underlying tokens
-5. Router transfers USDC/USDT to user
+- `src/interfaces/onboarding/IGSMRouter.sol`
 
-## Contract Addresses (Ethereum Mainnet)
+## Mainnet dependencies
 
-| Contract | Address |
-|----------|---------|
-| **GHO Router** | _To be deployed_ |
-| USDC | `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` |
-| USDT | `0xdAC17F958D2ee523a2206206994597C13D831ec7` |
-| GHO | `0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f` |
-| Aave V3 Pool | `0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2` |
-| GSM USDC | `0xFeeb6FE430B7523fEF2a38327241eE7153779535` |
-| GSM USDT | `0x535b2f7C20B9C83d70e519cf9991578eF9816B7B` |
-| stataUSDC | `0xD4fa2D31b7968E448877f69A96DE69f5de8cD23E` |
-| stataUSDT | `0x7Bc3485026Ac48b6cf9BaF0A377477Fff5703Af8` |
+Configured in `script/DeployGSMRouter.s.sol`:
 
-## Usage
+- GHO: [`0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f`](https://etherscan.io/address/0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f)
+- sGHO: [`0x73edDFa87C71ADdC275c2b9890f5c3a8480bC9E6`](https://etherscan.io/address/0x73edDFa87C71ADdC275c2b9890f5c3a8480bC9E6)
+- GSM USDC: [`0xFeeb6FE430B7523fEF2a38327241eE7153779535`](https://etherscan.io/address/0xFeeb6FE430B7523fEF2a38327241eE7153779535)
+- GSM USDT: [`0x535b2f7C20B9C83d70e519cf9991578eF9816B7B`](https://etherscan.io/address/0x535b2f7C20B9C83d70e519cf9991578eF9816B7B)
+- USDC: [`0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48`](https://etherscan.io/address/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48)
+- USDT: [`0xdAC17F958D2ee523a2206206994597C13D831ec7`](https://etherscan.io/address/0xdAC17F958D2ee523a2206206994597C13D831ec7)
+- stataUSDC: [`0xD4fa2D31b7968E448877f69A96DE69f5de8cD23E`](https://etherscan.io/address/0xD4fa2D31b7968E448877f69A96DE69f5de8cD23E)
+- stataUSDT: [`0x7Bc3485026Ac48b6cf9BaF0A377477Fff5703Af8`](https://etherscan.io/address/0x7Bc3485026Ac48b6cf9BaF0A377477Fff5703Af8)
 
-### Installation
+## Setup
 
 ```bash
-# Clone the repository
-git clone https://github.com/[username]/griffin
-cd griffin
-
-# Install dependencies
 forge install
-
-# Build contracts
 forge build
 ```
 
-### Testing
+Create env file:
 
 ```bash
-# Run all tests
+cp .env.example .env
+```
+
+Expected env vars:
+
+- `PRIVATE_KEY`
+- `RPC_URL_MAINNET`
+- `ETHERSCAN_API_KEY`
+
+## Testing
+
+Run full suite:
+
+```bash
 forge test
-
-# Run tests with mainnet fork
-forge test --fork-url https://eth.llamarpc.com -vvv
-
-# Run specific test
-forge test --match-test testVerifyAddresses -vv --fork-url https://eth.llamarpc.com
-
-# Gas report
-forge test --gas-report
 ```
 
-### Integration Example
+Run unit onboarding tests:
 
-```solidity
-import {GSMRouter} from "./src/GSMRouter.sol";
-import {IERC20} from "./src/interfaces/IERC20.sol";
-
-// Deploy router
-GSMRouter router = new GSMRouter();
-
-// Swap USDC to GHO
-IERC20(USDC).approve(address(router), 1000e6);
-uint256 ghoReceived = router.swapToGHO(
-    USDC,           // input token
-    1000e6,         // 1000 USDC (6 decimals)
-    990e18          // minimum 990 GHO (1% slippage)
-);
-
-// Swap GHO back to USDC
-IERC20(GHO).approve(address(router), 1000e18);
-uint256 usdcReceived = router.swapFromGHO(
-    USDC,           // output token
-    1000e18,        // 1000 GHO
-    990e6           // minimum 990 USDC
-);
+```bash
+forge test --match-path test/unit/onboarding/* -vvv
 ```
 
-### Frontend Integration
+Run fork onboarding tests (mainnet RPC required):
 
-```typescript
-// TypeScript/ethers.js example
-const router = new ethers.Contract(routerAddress, GSMRouterABI, signer);
+```bash
+forge test --match-path test/fork/onboarding/GSMRouterTest.t.sol --fork-url "$RPC_URL_MAINNET" -vvv
+```
 
-// Approve USDC
-const usdc = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, signer);
-await usdc.approve(routerAddress, amount);
+## Deployment
 
-// Swap to GHO
-const tx = await router.swapToGHO(
-  USDC_ADDRESS,
-  ethers.parseUnits("1000", 6),  // 1000 USDC
-  ethers.parseUnits("990", 18)   // min 990 GHO (1% slippage)
-);
-await tx.wait();
+Build and deploy with verification:
+
+```bash
+forge script script/DeployGSMRouter.s.sol:DeployGSMRouter \
+  --rpc-url mainnet \
+  --broadcast \
+  --verify \
+  -vvv
 ```
 
 ## Security
 
-### Audit Status
-⚠️ **Not audited** - External audit recommended before mainnet deployment
+Status: not yet audited.
 
-### Security Features
+Security assumptions and failure modes are documented in:
 
-1. **Exact Approvals**: Contract only approves the exact amounts needed for each operation
-2. **No Fund Storage**: Contract never stores user funds between transactions
-3. **Slippage Protection**: All swaps require minimum output amounts
-4. **Reentrancy Safe**: No state changes after external calls
-5. **Error Handling**: Clear, descriptive error messages
+- `SECURITY_ASSUMPTIONS.md`
 
-### Known Considerations
+Notable operational points:
 
-- stataToken addresses need verification against production GSM contracts
-- aToken addresses are hardcoded (consider dynamic lookup for flexibility)
-- Gas optimization opportunities exist (consider batching)
+- Downstream GSM/staticAToken/sGHO dependencies can change independently.
+- Preview outputs are estimates, not execution guarantees.
+- Integrators should monitor `DustReturned` events and set conservative slippage bounds.
 
-## Development
+## Repository layout
 
-### Project Structure
-
+```text
+src/
+  contracts/onboarding/GSMRouter.sol
+  interfaces/IGSM.sol
+  interfaces/IStaticAToken.sol
+  interfaces/onboarding/IGSMRouter.sol
+script/
+  DeployGSMRouter.s.sol
+test/
+  unit/onboarding/GSMRouterTest.t.sol
+  unit/onboarding/GSMRouterSwapTosGHOTest.t.sol
+  unit/onboarding/GSMRouterAdvancedTest.t.sol
+  fork/onboarding/GSMRouterTest.t.sol
 ```
-griffin/
-├── src/
-│   ├── GSMRouter.sol           # Main router contract
-│   ├── Addresses.sol           # Mainnet address constants
-│   └── interfaces/
-│       ├── IERC20.sol
-│       ├── IERC4626.sol
-│       ├── IGSM.sol
-│       └── IStaticAToken.sol
-├── test/
-│   ├── GSMRouter.t.sol         # Integration tests
-├── foundry.toml                # Foundry configuration
-├── README.md                   # This file
-```
-
-
-## Resources
-
-- [GSM Frontend](https://app.gsm.tokenlogic.xyz/)
-- [Aave V3 Documentation](https://docs.aave.com/developers/getting-started/readme)
-- [GHO Documentation](https://docs.gho.xyz/)
-- [Static aToken V3](https://github.com/bgd-labs/static-a-token-v3)
-- [Aave Address Book](https://github.com/bgd-labs/aave-address-book)
-- [Foundry Book](https://book.getfoundry.sh/)
 
 ## License
 
 MIT
-
-## Disclaimer
-
-This software is provided "as is", without warranty of any kind. Use at your own risk. Always verify contract addresses and test thoroughly before using with real funds.
