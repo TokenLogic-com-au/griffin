@@ -288,19 +288,17 @@ contract GSMRouter is Ownable, IGSMRouter {
         return (ghoAmount, amount - dustRedeemed);
     }
 
-    function _previewSwapFromGho(address gsm, address stataToken, uint256 ghoAmount) internal view returns (uint256, uint256) {
+    function _previewSwapFromGho(address gsm, address stataToken, uint256 ghoAmount)
+        internal
+        view
+        returns (uint256, uint256)
+    {
         (uint256 assetAmount,,, uint256 fee) = IGSM(gsm).getAssetAmountForBuyAsset(ghoAmount);
         uint256 outputAmount = IStaticAToken(stataToken).previewRedeem(assetAmount);
         return (outputAmount, fee);
     }
 
-    function _swapGhoToUnderlying(
-        address gsm,
-        address stataToken,
-        uint256 ghoAmount,
-        uint256 minOut,
-        address recipient
-    )
+    function _swapGhoToUnderlying(address gsm, address stataToken, uint256 ghoAmount, uint256 minOut, address recipient)
         internal
         returns (uint256, uint256)
     {

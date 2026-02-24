@@ -157,10 +157,7 @@ interface IGSMRouter {
      * @return assetAmount Expected amount of output token to receive
      * @return fee Fee amount charged by the GSM
      */
-    function previewSwapFromGHO(address token, uint256 ghoAmount)
-        external
-        view
-        returns (uint256, uint256);
+    function previewSwapFromGHO(address token, uint256 ghoAmount) external view returns (uint256, uint256);
 
     /**
      * @notice Preview the amount of output token received for a given sGHO share amount
@@ -170,10 +167,7 @@ interface IGSMRouter {
      * @return outputAmount Expected amount of output token to receive
      * @return fee Fee amount charged by the GSM (0 for direct sGHO->GHO output)
      */
-    function previewSwapFromsGHO(address token, uint256 amount)
-        external
-        view
-        returns (uint256, uint256);
+    function previewSwapFromsGHO(address token, uint256 amount) external view returns (uint256, uint256);
 
     /**
      * @notice Returns address of the GHO token on the deployed network

@@ -63,12 +63,7 @@ contract sGHO is ERC4626, ERC20Permit, AccessControl, Pausable {
         _targetRate = 0;
     }
 
-    function depositWithPermit(
-        uint256 assets,
-        address receiver,
-        uint256 deadline,
-        SignatureParams memory sig
-    )
+    function depositWithPermit(uint256 assets, address receiver, uint256 deadline, SignatureParams memory sig)
         external
         returns (uint256)
     {

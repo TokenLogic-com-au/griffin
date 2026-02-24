@@ -189,9 +189,7 @@ contract GSMRouterSwapTosGHOTest is Test {
         emit IGSMRouter.DustReturned(USER, USDC, expectedDust);
 
         vm.expectEmit(true, true, true, true);
-        emit IGSMRouter.SwapTosGHO(
-            USER, USDC, address(sgho), expectedConsumed, expectedConsumed, expectedConsumed
-        );
+        emit IGSMRouter.SwapTosGHO(USER, USDC, address(sgho), expectedConsumed, expectedConsumed, expectedConsumed);
 
         uint256 shares = router.swapTosGHO(USDC, INPUT_AMOUNT, expectedConsumed);
         vm.stopPrank();
@@ -238,18 +236,14 @@ contract GSMRouterSwapTosGHOTest is Test {
         emit IGSMRouter.SwapToGHO(USER, USDC, INPUT_AMOUNT, INPUT_AMOUNT);
         router.swapToGHO(USDC, INPUT_AMOUNT, 0);
         assertEq(
-            IERC20(USDC).allowance(address(router), STATA_USDC),
-            0,
-            "swapToGHO should clear token->stata allowance"
+            IERC20(USDC).allowance(address(router), STATA_USDC), 0, "swapToGHO should clear token->stata allowance"
         );
 
         vm.expectEmit(true, true, true, true);
         emit IGSMRouter.SwapTosGHO(USER, USDC, address(sgho), INPUT_AMOUNT, INPUT_AMOUNT, INPUT_AMOUNT);
         router.swapTosGHO(USDC, INPUT_AMOUNT, 0);
         assertEq(
-            IERC20(USDC).allowance(address(router), STATA_USDC),
-            0,
-            "swapTosGHO should clear token->stata allowance"
+            IERC20(USDC).allowance(address(router), STATA_USDC), 0, "swapTosGHO should clear token->stata allowance"
         );
         vm.stopPrank();
     }
@@ -261,9 +255,7 @@ contract GSMRouterSwapTosGHOTest is Test {
         IERC20(address(sgho)).approve(address(router), GHO_INPUT_AMOUNT);
 
         vm.expectEmit(true, true, true, true);
-        emit IGSMRouter.SwapFromsGHO(
-            USER, address(sgho), GHO, GHO_INPUT_AMOUNT, GHO_INPUT_AMOUNT, GHO_INPUT_AMOUNT
-        );
+        emit IGSMRouter.SwapFromsGHO(USER, address(sgho), GHO, GHO_INPUT_AMOUNT, GHO_INPUT_AMOUNT, GHO_INPUT_AMOUNT);
 
         uint256 ghoAmount = router.swapFromsGHO(GHO, GHO_INPUT_AMOUNT, GHO_INPUT_AMOUNT);
         vm.stopPrank();
@@ -280,9 +272,7 @@ contract GSMRouterSwapTosGHOTest is Test {
         IERC20(address(sgho)).approve(address(router), GHO_INPUT_AMOUNT);
 
         vm.expectEmit(true, true, true, true);
-        emit IGSMRouter.SwapFromsGHO(
-            USER, address(sgho), USDC, GHO_INPUT_AMOUNT, GHO_INPUT_AMOUNT, GHO_INPUT_AMOUNT
-        );
+        emit IGSMRouter.SwapFromsGHO(USER, address(sgho), USDC, GHO_INPUT_AMOUNT, GHO_INPUT_AMOUNT, GHO_INPUT_AMOUNT);
 
         uint256 outputAmount = router.swapFromsGHO(USDC, GHO_INPUT_AMOUNT, GHO_INPUT_AMOUNT);
         vm.stopPrank();
@@ -323,9 +313,7 @@ contract GSMRouterSwapTosGHOTest is Test {
         emit IGSMRouter.DustReturned(USER, GHO, expectedDust);
 
         vm.expectEmit(true, true, true, true);
-        emit IGSMRouter.SwapFromsGHO(
-            USER, address(sgho), USDC, GHO_INPUT_AMOUNT, GHO_INPUT_AMOUNT, expectedConsumed
-        );
+        emit IGSMRouter.SwapFromsGHO(USER, address(sgho), USDC, GHO_INPUT_AMOUNT, GHO_INPUT_AMOUNT, expectedConsumed);
 
         uint256 outputAmount = router.swapFromsGHO(USDC, GHO_INPUT_AMOUNT, expectedConsumed);
         vm.stopPrank();
@@ -408,8 +396,6 @@ contract GSMRouterSwapTosGHOTest is Test {
         router.swapFromsGHO(USDC, GHO_INPUT_AMOUNT, 0);
         vm.stopPrank();
 
-        assertEq(
-            IERC20(GHO).allowance(address(router), GSM_USDC), 0, "swapFromsGHO should clear GHO->GSM allowance"
-        );
+        assertEq(IERC20(GHO).allowance(address(router), GSM_USDC), 0, "swapFromsGHO should clear GHO->GSM allowance");
     }
 }

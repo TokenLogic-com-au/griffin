@@ -139,12 +139,7 @@ contract MockSGHO is ERC20 {
         return _convertToAssets(shares, _getCurrentYieldIndex());
     }
 
-    function depositWithPermit(
-        uint256 assets,
-        address receiver,
-        uint256,
-        SignatureParams memory
-    )
+    function depositWithPermit(uint256 assets, address receiver, uint256, SignatureParams memory)
         external
         returns (uint256)
     {
