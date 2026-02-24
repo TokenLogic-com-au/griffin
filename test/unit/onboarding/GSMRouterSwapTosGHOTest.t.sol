@@ -346,6 +346,22 @@ contract GSMRouterSwapTosGHOTest is Test {
         vm.stopPrank();
     }
 
+    function test_preview_swap_tos_gho_quotes_using_vault_rate_and_gsm_fee() public {
+        sghoWithRate.setExchangeRate(1.1e18);
+        gsmUsdcWithFees.setFeeBps(100); // 1%
+
+        uint256 expectedGho = INPUT_AMOUNT - (INPUT_AMOUNT / 100);
+        uint256 expectedShares = (expectedGho * 1e18) / 1.1e18;
+
+        (uint256 usdcShares, uint256 usdcFee) = routerWithRate.previewSwapTosGHO(USDC, INPUT_AMOUNT);
+        assertEq(usdcShares, expectedShares, "USDC preview should include GSM fee and vault rate");
+        assertEq(usdcFee, INPUT_AMOUNT / 100, "fee should match GSM preview fee");
+
+        (uint256 ghoShares, uint256 ghoFee) = routerWithRate.previewSwapTosGHO(GHO, GHO_INPUT_AMOUNT);
+        assertEq(ghoShares, (GHO_INPUT_AMOUNT * 1e18) / 1.1e18, "GHO preview should use vault previewDeposit rate");
+        assertEq(ghoFee, 0, "direct GHO->sGHO preview should return zero fee");
+    }
+
     function test_preview_swap_froms_gho_quotes_using_vault_rate_and_gsm_fee() public {
         sghoWithRate.setExchangeRate(1.1e18);
         gsmUsdcWithFees.setFeeBps(100); // 1%

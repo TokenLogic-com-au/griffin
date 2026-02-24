@@ -35,6 +35,10 @@ contract MockSGHO is ERC20 {
         gho.safeTransfer(receiver, assets);
     }
 
+    function previewDeposit(uint256 assets) external pure returns (uint256 shares) {
+        return assets;
+    }
+
     function previewRedeem(uint256 shares) external pure returns (uint256 assets) {
         return shares;
     }

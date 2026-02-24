@@ -130,6 +130,16 @@ interface IGSMRouter {
     function rescueToken(address token, address to, uint256 amount) external;
 
     /**
+     * @notice Preview the amount of sGHO shares received for a given input amount
+     * @dev This is an estimation and actual results may vary due to GSM execution and vault share price
+     * @param token Input token address (USDC/USDT/GHO)
+     * @param amount Amount of input token to sell
+     * @return sghoAmount Expected amount of sGHO shares to receive
+     * @return fee Fee amount charged by the GSM (0 for direct GHO->sGHO input)
+     */
+    function previewSwapTosGHO(address token, uint256 amount) external view returns (uint256, uint256);
+
+    /**
      * @notice Preview the amount of GHO received for a given input amount
      * @dev This is an estimation and actual results may vary slightly due to interest accrual
      * @param token Input token address (USDC/USDT)

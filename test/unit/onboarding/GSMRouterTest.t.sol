@@ -369,6 +369,55 @@ contract PreviewSwapFromGHOTest is GSMRouterTest {
     }
 }
 
+contract PreviewSwapTosGHOTest is GSMRouterTest {
+    function test_preview_swap_tos_gho_from_gho_success() public view {
+        (uint256 outputAmount, uint256 fee) = router.previewSwapTosGHO(GHO, GHO_AMOUNT);
+
+        assertEq(outputAmount, GHO_AMOUNT, "Should preview correct sGHO amount");
+        assertEq(fee, 0, "Direct GHO->sGHO path should have zero GSM fee");
+    }
+
+    function test_preview_swap_tos_gho_from_usdc_success() public view {
+        (uint256 outputAmount, uint256 fee) = router.previewSwapTosGHO(USDC, USDC_AMOUNT);
+
+        assertEq(outputAmount, USDC_AMOUNT, "Should preview correct sGHO amount");
+        assertEq(fee, 0, "Should have 0 fee in mock");
+    }
+
+    function test_reverts_preview_swap_tos_gho_unsupported_token() public {
+        address unsupportedToken = makeAddr("new-token");
+
+        vm.expectRevert(IGSMRouter.InvalidToken.selector);
+        router.previewSwapTosGHO(unsupportedToken, GHO_AMOUNT);
+    }
+
+    function test_reverts_preview_swap_tos_gho_zero_amount() public {
+        vm.expectRevert(IGSMRouter.InvalidAmount.selector);
+        router.previewSwapTosGHO(GHO, 0);
+    }
+
+    function test_fuzz_preview_swap_tos_gho(uint256 amount, uint8 tokenChoice) public view {
+        amount = bound(amount, 1, 1_000_000 * 1e18);
+
+        address token;
+        if (tokenChoice % 3 == 0) {
+            token = USDC;
+        } else if (tokenChoice % 3 == 1) {
+            token = USDT;
+        } else {
+            token = GHO;
+        }
+
+        (uint256 outputAmount, uint256 fee) = router.previewSwapTosGHO(token, amount);
+        assertEq(outputAmount, amount, "Preview should return 1:1 amount in mock setup");
+        if (token == GHO) {
+            assertEq(fee, 0, "Direct GHO->sGHO path should have zero fee");
+        } else {
+            assertEq(fee, 0, "GSM fee should be 0 in mock");
+        }
+    }
+}
+
 contract PreviewSwapFromsGHOTest is GSMRouterTest {
     function test_preview_swap_from_sgho_to_gho_success() public view {
         (uint256 outputAmount, uint256 fee) = router.previewSwapFromsGHO(GHO, GHO_AMOUNT);

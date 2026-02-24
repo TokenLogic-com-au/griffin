@@ -169,6 +169,24 @@ contract GSMRouter is Ownable, IGSMRouter {
     }
 
     /// @inheritdoc IGSMRouter
+    function previewSwapTosGHO(address token, uint256 amount) external view returns (uint256, uint256) {
+        if (amount < 1) revert InvalidAmount();
+
+        uint256 ghoAmount;
+        uint256 fee;
+        if (token == _GHO) {
+            ghoAmount = amount;
+        } else {
+            (address gsm, address stataToken) = _getRoute(token);
+            uint256 sharesAmount = IStaticAToken(stataToken).previewDeposit(amount);
+            (, ghoAmount,, fee) = IGSM(gsm).getGhoAmountForSellAsset(sharesAmount);
+        }
+
+        uint256 sghoAmount = IERC4626(_sGHO).previewDeposit(ghoAmount);
+        return (sghoAmount, fee);
+    }
+
+    /// @inheritdoc IGSMRouter
     function previewSwapToGHO(address token, uint256 amount) external view returns (uint256, uint256) {
         if (amount < 1) revert InvalidAmount();
 

@@ -36,6 +36,7 @@ Using GSM routes directly requires users/integrators to handle:
 - `swapFromGHO(address token, uint256 ghoAmount, uint256 minOutputAmount) -> uint256`
 - `swapTosGHO(address token, uint256 amount, uint256 minOut) -> uint256`
 - `swapFromsGHO(address token, uint256 amount, uint256 minOut) -> uint256`
+- `previewSwapTosGHO(address token, uint256 amount) -> (uint256 sghoAmount, uint256 fee)`
 - `previewSwapToGHO(address token, uint256 amount) -> (uint256 ghoAmount, uint256 fee)`
 - `previewSwapFromGHO(address token, uint256 ghoAmount) -> (uint256 assetAmount, uint256 fee)`
 - `previewSwapFromsGHO(address token, uint256 amount) -> (uint256 outputAmount, uint256 fee)`

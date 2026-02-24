@@ -270,6 +270,15 @@ contract SwapTosGHOTest is GSMRouterTest {
         assertEq(shares, ghoAmount, "Mock sGHO should mint 1:1 shares");
         assertEq(IERC20(address(sgho)).balanceOf(USER), ghoAmount, "User should receive all shares");
     }
+
+    function test_preview_swap_to_sg_ho() public view {
+        uint256 usdcAmount = 1000 * 1e6;
+
+        (uint256 sghoAmount, uint256 fee) = router.previewSwapTosGHO(USDC, usdcAmount);
+
+        assertGt(sghoAmount, 0, "Should preview sGHO amount");
+        assertGe(fee, 0, "Fee check should not revert");
+    }
 }
 
 contract SwapFromsGHOTest is GSMRouterTest {

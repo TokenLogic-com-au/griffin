@@ -54,6 +54,12 @@ or re-validate route wiring on each swap call.
 - Slippage checks enforce minimum outputs:
   - `minGHOAmount`, `minOutputAmount`, `minOut`
 - `rescueToken` is `onlyOwner`
+- Reentrancy stance: the router does not use an explicit reentrancy guard. Neither do its
+  external dependencies (GSM, StataTokenV2, and sGHO). Reentrancy risk is mitigated by the fact
+  that all tokens in the call chain (GHO, USDC, USDT) are standard ERC20s with no transfer
+  callbacks, the GSM follows checks-effects-interactions internally, and the router uses
+  balance-delta accounting. If a future dependency introduces callback-capable tokens or hooks,
+  this assumption should be revisited.
 
 These controls reduce common integration risk but do not remove dependency risk.
 
