@@ -12,14 +12,20 @@ import {GSMRouter} from "src/contracts/onboarding/GSMRouter.sol";
 contract DeployGSMRouter is Script {
     // https://etherscan.io/address/0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f
     address public constant GHO = 0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f;
+    // To be deployed
+    address public constant sGHO = 0x0000000000000000000000000000000000000000;
+    // https://etherscan.io/address/0xFeeb6FE430B7523fEF2a38327241eE7153779535
+    address public constant GSM_USDC = 0xFeeb6FE430B7523fEF2a38327241eE7153779535;
+    // https://etherscan.io/address/0x535b2f7C20B9C83d70e519cf9991578eF9816B7B
+    address public constant GSM_USDT = 0x535b2f7C20B9C83d70e519cf9991578eF9816B7B;
 
-    function run() external returns (GSMRouter router) {
+    function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address owner = vm.addr(deployerPrivateKey);
 
         vm.startBroadcast(deployerPrivateKey);
 
-        router = new GSMRouter(owner, GHO);
+        new GSMRouter(owner, GHO, sGHO, GSM_USDC, GSM_USDT);
 
         vm.stopBroadcast();
     }
