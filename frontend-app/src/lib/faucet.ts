@@ -425,12 +425,11 @@ async function transferFromImpersonatedAccount(
 
 async function previewGhoOut(inputToken: Address, inputAmount: bigint): Promise<bigint> {
   const { publicClient } = getClients();
-  const gsmAddress = getGsmForToken(inputToken);
   const result = await publicClient.readContract({
     address: addresses.gsmRouter,
     abi: gsmRouterAbi,
     functionName: "previewSwapToGHO",
-    args: [gsmAddress, inputAmount],
+    args: [inputToken, inputAmount],
   }) as [bigint, bigint];
   return result[0];
 }
@@ -534,7 +533,7 @@ async function swapStableWhaleToGho(
     const swapData = encodeFunctionData({
       abi: gsmRouterAbi,
       functionName: "swapToGHO",
-      args: [gsmAddress, inputAmount, targetGhoAmount],
+      args: [inputToken, inputAmount, targetGhoAmount],
     });
     const swapTx = await walletClient.sendTransaction({
       to: addresses.gsmRouter,

@@ -71,7 +71,7 @@ export function DepositForm() {
       if (depositTxHash) {
         trackEvent({
           type: "deposit_completed", token: selectedToken,
-          shares: depositEvent?.sharesReceived?.toString() ?? "0", txHash: depositTxHash,
+          shares: depositEvent?.sghoAmount?.toString() ?? "0", txHash: depositTxHash,
         });
       }
     }
@@ -96,20 +96,14 @@ export function DepositForm() {
 
   const isInProgress = ["pending", "confirming"].includes(approveStatus) || ["pending", "confirming"].includes(depositStatus);
   const awaitingDepositAction = approveStatus === "success" && depositStatus === "idle";
-  const requiresPreview = selectedToken !== "GHO";
-  const previewReady = !requiresPreview || !!preview;
+  const previewReady = !!preview;
 
   const handleSubmit = useCallback(() => {
-    if (!parsedAmount || !validation.valid) return;
-    let quotedGhoAmount = parsedAmount;
-    if (selectedToken !== "GHO") {
-      if (!preview) return;
-      quotedGhoAmount = preview.ghoAmount;
-    }
+    if (!parsedAmount || !validation.valid || !preview) return;
     if (needsApproval && approveStatus === "idle") {
       approve(token.address, parsedAmount, selectedToken);
     } else {
-      deposit(token.address, parsedAmount, quotedGhoAmount, selectedToken);
+      deposit(token.address, parsedAmount, preview.estimatedShares, selectedToken);
     }
   }, [
     parsedAmount,
@@ -190,7 +184,7 @@ export function DepositForm() {
           <div>
             <p className="text-sm font-medium text-[var(--success)]">Deposit successful</p>
             <p className="text-xs text-[var(--text-muted)]">
-              Received {formatTokenAmount(depositEvent.sharesReceived, 18)} sGHO
+              Received {formatTokenAmount(depositEvent.sghoAmount, 18)} sGHO
               {dustEvents.length > 0 && " (dust returned)"}
             </p>
           </div>

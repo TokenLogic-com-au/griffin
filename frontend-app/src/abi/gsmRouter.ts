@@ -9,9 +9,30 @@ export const gsmRouterAbi = [
   },
   {
     type: "function",
+    name: "sGHO",
+    inputs: [],
+    outputs: [{ name: "", type: "address", internalType: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "GSM_USDC",
+    inputs: [],
+    outputs: [{ name: "", type: "address", internalType: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "GSM_USDT",
+    inputs: [],
+    outputs: [{ name: "", type: "address", internalType: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
     name: "previewSwapToGHO",
     inputs: [
-      { name: "gsm", type: "address", internalType: "address" },
+      { name: "token", type: "address", internalType: "address" },
       { name: "amount", type: "uint256", internalType: "uint256" },
     ],
     outputs: [
@@ -24,7 +45,7 @@ export const gsmRouterAbi = [
     type: "function",
     name: "previewSwapFromGHO",
     inputs: [
-      { name: "gsm", type: "address", internalType: "address" },
+      { name: "token", type: "address", internalType: "address" },
       { name: "ghoAmount", type: "uint256", internalType: "uint256" },
     ],
     outputs: [
@@ -38,7 +59,7 @@ export const gsmRouterAbi = [
     type: "function",
     name: "swapToGHO",
     inputs: [
-      { name: "gsm", type: "address", internalType: "address" },
+      { name: "token", type: "address", internalType: "address" },
       { name: "amount", type: "uint256", internalType: "uint256" },
       { name: "minGHOAmount", type: "uint256", internalType: "uint256" },
     ],
@@ -49,11 +70,33 @@ export const gsmRouterAbi = [
     type: "function",
     name: "swapFromGHO",
     inputs: [
-      { name: "gsm", type: "address", internalType: "address" },
+      { name: "token", type: "address", internalType: "address" },
       { name: "ghoAmount", type: "uint256", internalType: "uint256" },
       { name: "minOutputAmount", type: "uint256", internalType: "uint256" },
     ],
     outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "swapTosGHO",
+    inputs: [
+      { name: "token", type: "address", internalType: "address" },
+      { name: "amount", type: "uint256", internalType: "uint256" },
+      { name: "minOut", type: "uint256", internalType: "uint256" },
+    ],
+    outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "rescueToken",
+    inputs: [
+      { name: "token", type: "address", internalType: "address" },
+      { name: "to", type: "address", internalType: "address" },
+      { name: "amount", type: "uint256", internalType: "uint256" },
+    ],
+    outputs: [],
     stateMutability: "nonpayable",
   },
   // -- Events --
@@ -76,6 +119,19 @@ export const gsmRouterAbi = [
       { name: "outputToken", type: "address", indexed: true, internalType: "address" },
       { name: "ghoAmount", type: "uint256", indexed: false, internalType: "uint256" },
       { name: "outputAmount", type: "uint256", indexed: false, internalType: "uint256" },
+    ],
+    anonymous: false,
+  },
+  {
+    type: "event",
+    name: "SwapTosGHO",
+    inputs: [
+      { name: "user", type: "address", indexed: true, internalType: "address" },
+      { name: "inputToken", type: "address", indexed: true, internalType: "address" },
+      { name: "sgho", type: "address", indexed: true, internalType: "address" },
+      { name: "inputAmount", type: "uint256", indexed: false, internalType: "uint256" },
+      { name: "ghoAmount", type: "uint256", indexed: false, internalType: "uint256" },
+      { name: "sghoAmount", type: "uint256", indexed: false, internalType: "uint256" },
     ],
     anonymous: false,
   },

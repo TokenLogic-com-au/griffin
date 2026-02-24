@@ -3,7 +3,7 @@
 import { useReadContract } from "wagmi";
 import { gsmRouterAbi } from "@/abi/gsmRouter";
 import { erc4626Abi } from "@/abi/erc4626";
-import { addresses, getGsmForToken } from "@/config/addresses";
+import { addresses } from "@/config/addresses";
 import { calculateSlippageBps } from "@/lib/validation";
 import type { Address } from "viem";
 import type { DepositPreview } from "@/types";
@@ -23,14 +23,13 @@ export function usePreviewDeposit(
   const enabled = !!tokenAddress && !!amount && amount > 0n;
 
   // Step 1: For non-GHO tokens, preview the GSM swap to get GHO amount
-  const gsmAddress = !isGHO && tokenAddress ? getGsmForToken(tokenAddress) : undefined;
   const gsmPreview = useReadContract({
     address: addresses.gsmRouter,
     abi: gsmRouterAbi,
     functionName: "previewSwapToGHO",
-    args: gsmAddress && amount ? [gsmAddress, amount] : undefined,
+    args: tokenAddress && amount ? [tokenAddress, amount] : undefined,
     query: {
-      enabled: enabled && !isGHO && !!gsmAddress,
+      enabled: enabled && !isGHO,
     },
   });
 

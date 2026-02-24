@@ -6,7 +6,7 @@ import {
   useWatchContractEvent,
 } from "wagmi";
 import { useCallback, useState } from "react";
-import { onboardingRouterAbi } from "@/abi/onboardingRouter";
+import { gsmRouterAbi } from "@/abi/gsmRouter";
 import { addresses } from "@/config/addresses";
 import { targetChain } from "@/config/chains";
 import { parseError } from "@/lib/errors";
@@ -17,7 +17,7 @@ import type { StepStatus, SupportedToken } from "@/types";
 interface RedeemEvent {
   user: Address;
   outputToken: Address;
-  sharesRedeemed: bigint;
+  ghoAmount: bigint;
   outputAmount: bigint;
 }
 
@@ -28,8 +28,8 @@ interface DustEvent {
 }
 
 /**
- * Hook for executing onboarding router redeem().
- * Tracks full tx lifecycle and watches for Redeemed + DustReturned events.
+ * Hook for executing GSMRouter.swapFromGHO().
+ * Tracks full tx lifecycle and watches for SwapFromGHO + DustReturned events.
  */
 export function useRedeem() {
   const [redeemEvent, setRedeemEvent] = useState<RedeemEvent | null>(null);
@@ -54,12 +54,12 @@ export function useRedeem() {
     chainId: targetChain.id,
   });
 
-  // Watch for Redeemed event
+  // Watch for SwapFromGHO event
   useWatchContractEvent({
     chainId: targetChain.id,
     address: addresses.gsmRouter,
-    abi: onboardingRouterAbi,
-    eventName: "Redeemed",
+    abi: gsmRouterAbi,
+    eventName: "SwapFromGHO",
     onLogs(logs) {
       for (const log of logs) {
         if (log.transactionHash === txHash) {
@@ -75,7 +75,7 @@ export function useRedeem() {
   useWatchContractEvent({
     chainId: targetChain.id,
     address: addresses.gsmRouter,
-    abi: onboardingRouterAbi,
+    abi: gsmRouterAbi,
     eventName: "DustReturned",
     onLogs(logs) {
       for (const log of logs) {
@@ -90,7 +90,7 @@ export function useRedeem() {
 
   const redeem = useCallback(
     (
-      shares: bigint,
+      ghoAmount: bigint,
       tokenAddress: Address,
       minOutputAmount: bigint,
       tokenSymbol: SupportedToken
@@ -98,14 +98,14 @@ export function useRedeem() {
       setRedeemEvent(null);
       setDustEvents([]);
 
-      trackEvent({ type: "redeem_started", token: tokenSymbol, shares: shares.toString() });
+      trackEvent({ type: "redeem_started", token: tokenSymbol, shares: ghoAmount.toString() });
 
       writeContract({
         chainId: targetChain.id,
         address: addresses.gsmRouter,
-        abi: onboardingRouterAbi,
-        functionName: "redeem",
-        args: [shares, tokenAddress, minOutputAmount],
+        abi: gsmRouterAbi,
+        functionName: "swapFromGHO",
+        args: [tokenAddress, ghoAmount, minOutputAmount],
       });
     },
     [writeContract]

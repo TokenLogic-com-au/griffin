@@ -6,7 +6,7 @@ import {
   useWatchContractEvent,
 } from "wagmi";
 import { useCallback, useState } from "react";
-import { onboardingRouterAbi } from "@/abi/onboardingRouter";
+import { gsmRouterAbi } from "@/abi/gsmRouter";
 import { addresses } from "@/config/addresses";
 import { targetChain } from "@/config/chains";
 import { parseError } from "@/lib/errors";
@@ -17,9 +17,10 @@ import type { StepStatus, SupportedToken } from "@/types";
 interface DepositEvent {
   user: Address;
   inputToken: Address;
+  sgho: Address;
   inputAmount: bigint;
   ghoAmount: bigint;
-  sharesReceived: bigint;
+  sghoAmount: bigint;
 }
 
 interface DustEvent {
@@ -29,8 +30,8 @@ interface DustEvent {
 }
 
 /**
- * Hook for executing onboarding router deposit().
- * Tracks full tx lifecycle and watches for Deposited + DustReturned events.
+ * Hook for executing GSMRouter.swapTosGHO().
+ * Tracks full tx lifecycle and watches for SwapTosGHO + DustReturned events.
  */
 export function useDeposit() {
   const [depositEvent, setDepositEvent] = useState<DepositEvent | null>(null);
@@ -55,12 +56,12 @@ export function useDeposit() {
     chainId: targetChain.id,
   });
 
-  // Watch for Deposited event
+  // Watch for SwapTosGHO event
   useWatchContractEvent({
     chainId: targetChain.id,
     address: addresses.gsmRouter,
-    abi: onboardingRouterAbi,
-    eventName: "Deposited",
+    abi: gsmRouterAbi,
+    eventName: "SwapTosGHO",
     onLogs(logs) {
       for (const log of logs) {
         if (log.transactionHash === txHash) {
@@ -76,7 +77,7 @@ export function useDeposit() {
   useWatchContractEvent({
     chainId: targetChain.id,
     address: addresses.gsmRouter,
-    abi: onboardingRouterAbi,
+    abi: gsmRouterAbi,
     eventName: "DustReturned",
     onLogs(logs) {
       for (const log of logs) {
@@ -104,8 +105,8 @@ export function useDeposit() {
       writeContract({
         chainId: targetChain.id,
         address: addresses.gsmRouter,
-        abi: onboardingRouterAbi,
-        functionName: "deposit",
+        abi: gsmRouterAbi,
+        functionName: "swapTosGHO",
         args: [tokenAddress, amount, minOutputAmount],
       });
     },
