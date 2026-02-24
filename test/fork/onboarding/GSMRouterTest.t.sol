@@ -9,7 +9,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {GSMRouter} from "src/contracts/onboarding/GSMRouter.sol";
 import {IGSMRouter} from "src/interfaces/onboarding/IGSMRouter.sol";
 import {IGSM} from "src/interfaces/IGSM.sol";
-import {MockSGHO} from "test/mocks/MockSGHO.sol";
+import {sGHO} from "test/mocks/sGHO.sol";
 
 /**
  * @title GSMRouterTest
@@ -18,7 +18,7 @@ import {MockSGHO} from "test/mocks/MockSGHO.sol";
  */
 contract GSMRouterTest is Test {
     GSMRouter public router;
-    MockSGHO public sgho;
+    sGHO public sgho;
 
     // https://etherscan.io/address/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
     address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
@@ -40,12 +40,12 @@ contract GSMRouterTest is Test {
     address constant GSM_USDT = 0x535b2f7C20B9C83d70e519cf9991578eF9816B7B;
 
     // Test user address
-    address constant USER = address(0xBEEF);
+    address constant USER = address(0xC0FFEE);
 
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("mainnet"));
 
-        sgho = new MockSGHO(GHO);
+        sgho = new sGHO(GHO, type(uint160).max, address(this));
         router = new GSMRouter(address(this), GHO, address(sgho), GSM_USDC, GSM_USDT);
     }
 
@@ -267,7 +267,7 @@ contract SwapTosGHOTest is GSMRouterTest {
         uint256 shares = router.swapTosGHO(GHO, ghoAmount, ghoAmount);
         vm.stopPrank();
 
-        assertEq(shares, ghoAmount, "Mock sGHO should mint 1:1 shares");
+        assertEq(shares, ghoAmount, "sGHO copy should mint 1:1 shares at initial index");
         assertEq(IERC20(address(sgho)).balanceOf(USER), ghoAmount, "User should receive all shares");
     }
 
@@ -333,7 +333,7 @@ contract SwapFromsGHOTest is GSMRouterTest {
 
         (uint256 outputAmount, uint256 fee) = router.previewSwapFromsGHO(GHO, shareAmount);
 
-        assertEq(outputAmount, shareAmount, "Mock sGHO preview should be 1:1");
+        assertEq(outputAmount, shareAmount, "sGHO copy preview should be 1:1 at initial index");
         assertEq(fee, 0, "Direct sGHO->GHO preview should have zero fee");
     }
 
