@@ -1,4 +1,4 @@
-export const sGHORouterAbi = [
+export const onboardingRouterAbi = [
   // -- Read --
   {
     type: "function",

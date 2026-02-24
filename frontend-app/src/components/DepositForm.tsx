@@ -172,7 +172,7 @@ export function DepositForm() {
 
       {awaitingDepositAction && (
         <p className="px-1 text-xs text-[var(--text-muted)]">
-          Approval confirmed. Click Deposit to submit the sGHORouter transaction.
+          Approval confirmed. Click Deposit to submit the router transaction.
         </p>
       )}
 

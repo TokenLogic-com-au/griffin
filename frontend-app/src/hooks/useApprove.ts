@@ -10,7 +10,7 @@ import type { Address } from "viem";
 import type { StepStatus, SupportedToken } from "@/types";
 
 /**
- * Hook to approve ERC20 token spending by sGHORouter.
+ * Hook to approve ERC20 token spending by the router contract.
  * Tracks tx lifecycle: idle -> pending -> confirming -> success/error.
  */
 export function useApprove() {
@@ -40,7 +40,7 @@ export function useApprove() {
         address: tokenAddress,
         abi: erc20Abi,
         functionName: "approve",
-        args: [addresses.sGHORouter, amount],
+        args: [addresses.gsmRouter, amount],
       });
     } catch (error) {
       const parsed = parseError(error);

@@ -6,7 +6,7 @@ import {
   useWatchContractEvent,
 } from "wagmi";
 import { useCallback, useState } from "react";
-import { sGHORouterAbi } from "@/abi/sGHORouter";
+import { onboardingRouterAbi } from "@/abi/onboardingRouter";
 import { addresses } from "@/config/addresses";
 import { targetChain } from "@/config/chains";
 import { parseError } from "@/lib/errors";
@@ -28,7 +28,7 @@ interface DustEvent {
 }
 
 /**
- * Hook for executing sGHORouter.redeem().
+ * Hook for executing onboarding router redeem().
  * Tracks full tx lifecycle and watches for Redeemed + DustReturned events.
  */
 export function useRedeem() {
@@ -57,8 +57,8 @@ export function useRedeem() {
   // Watch for Redeemed event
   useWatchContractEvent({
     chainId: targetChain.id,
-    address: addresses.sGHORouter,
-    abi: sGHORouterAbi,
+    address: addresses.gsmRouter,
+    abi: onboardingRouterAbi,
     eventName: "Redeemed",
     onLogs(logs) {
       for (const log of logs) {
@@ -74,8 +74,8 @@ export function useRedeem() {
   // Watch for DustReturned event
   useWatchContractEvent({
     chainId: targetChain.id,
-    address: addresses.sGHORouter,
-    abi: sGHORouterAbi,
+    address: addresses.gsmRouter,
+    abi: onboardingRouterAbi,
     eventName: "DustReturned",
     onLogs(logs) {
       for (const log of logs) {
@@ -102,8 +102,8 @@ export function useRedeem() {
 
       writeContract({
         chainId: targetChain.id,
-        address: addresses.sGHORouter,
-        abi: sGHORouterAbi,
+        address: addresses.gsmRouter,
+        abi: onboardingRouterAbi,
         functionName: "redeem",
         args: [shares, tokenAddress, minOutputAmount],
       });

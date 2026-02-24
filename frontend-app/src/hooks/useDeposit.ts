@@ -6,7 +6,7 @@ import {
   useWatchContractEvent,
 } from "wagmi";
 import { useCallback, useState } from "react";
-import { sGHORouterAbi } from "@/abi/sGHORouter";
+import { onboardingRouterAbi } from "@/abi/onboardingRouter";
 import { addresses } from "@/config/addresses";
 import { targetChain } from "@/config/chains";
 import { parseError } from "@/lib/errors";
@@ -29,7 +29,7 @@ interface DustEvent {
 }
 
 /**
- * Hook for executing sGHORouter.deposit().
+ * Hook for executing onboarding router deposit().
  * Tracks full tx lifecycle and watches for Deposited + DustReturned events.
  */
 export function useDeposit() {
@@ -58,8 +58,8 @@ export function useDeposit() {
   // Watch for Deposited event
   useWatchContractEvent({
     chainId: targetChain.id,
-    address: addresses.sGHORouter,
-    abi: sGHORouterAbi,
+    address: addresses.gsmRouter,
+    abi: onboardingRouterAbi,
     eventName: "Deposited",
     onLogs(logs) {
       for (const log of logs) {
@@ -75,8 +75,8 @@ export function useDeposit() {
   // Watch for DustReturned event
   useWatchContractEvent({
     chainId: targetChain.id,
-    address: addresses.sGHORouter,
-    abi: sGHORouterAbi,
+    address: addresses.gsmRouter,
+    abi: onboardingRouterAbi,
     eventName: "DustReturned",
     onLogs(logs) {
       for (const log of logs) {
@@ -103,8 +103,8 @@ export function useDeposit() {
 
       writeContract({
         chainId: targetChain.id,
-        address: addresses.sGHORouter,
-        abi: sGHORouterAbi,
+        address: addresses.gsmRouter,
+        abi: onboardingRouterAbi,
         functionName: "deposit",
         args: [tokenAddress, amount, minOutputAmount],
       });

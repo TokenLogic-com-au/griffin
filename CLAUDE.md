@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Agent instructions for working with the Griffin (sGHO Router) monorepo.
+Agent instructions for working with the Griffin (GSM Router) monorepo.
 
 ## Repository Structure
 
@@ -17,22 +17,17 @@ griffin/
 - OpenZeppelin via `@openzeppelin/=lib/openzeppelin-contracts/`
 
 ### Key Contracts
-- `src/contracts/onboarding/sGHORouter.sol` — Main router: deposits USDC/USDT/GHO into sGHO, redeems sGHO to USDC/USDT/GHO
-- `src/contracts/onboarding/GSMRouter.sol` — Lower-level: swaps USDC/USDT to GHO via GSM (stataToken wrapping)
-- `src/interfaces/onboarding/ISGHORouter.sol` — sGHORouter interface with events and errors
-- `src/interfaces/onboarding/IGSMRouter.sol` — GSMRouter interface with preview functions
-
-### Contract Functions (sGHORouter)
-- `deposit(token, amount, minOutputAmount) → shares` — Deposit GHO/USDC/USDT, receive sGHO shares
-- `redeem(shares, token, minOutputAmount) → amountOut` — Redeem sGHO shares for GHO/USDC/USDT
-- Events: `Deposited`, `Redeemed`, `DustReturned`
-- Custom errors: `ZeroAddress`, `InvalidToken`, `InvalidAmount`, `SlippageExceeded`, `InvalidConfiguration`
+- `src/contracts/onboarding/GSMRouter.sol` — Router for swaps between USDC/USDT/GHO and routing into sGHO
+- `src/interfaces/onboarding/IGSMRouter.sol` — GSMRouter interface with swap/preview functions
 
 ### Contract Functions (GSMRouter)
 - `swapToGHO(gsm, amount, minGHOAmount)` — Swap underlying to GHO
 - `swapFromGHO(gsm, ghoAmount, minOutputAmount)` — Swap GHO to underlying
+- `swapTosGHO(gsm, token, amount, minOut)` — Swap USDC/USDT/GHO into sGHO shares
 - `previewSwapToGHO(gsm, amount)` — Preview swap (view)
 - `previewSwapFromGHO(gsm, ghoAmount)` — Preview reverse swap (view)
+- Events: `SwapToGHO`, `SwapFromGHO`, `SwapTosGHO`, `DustReturned`
+- Custom errors: `ZeroAddress`, `InvalidToken`, `InvalidAmount`, `SlippageExceeded`, `InvalidGsm`
 
 ### Token Addresses (Ethereum Mainnet)
 - GHO: `0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f` (18 decimals)
@@ -61,7 +56,7 @@ forge test --fork-url https://eth.llamarpc.com -vvv
 ```
 src/
   app/            Next.js App Router (layout, page, providers, globals.css)
-  abi/            Typed ABIs: sGHORouter, GSMRouter, ERC20, ERC4626
+  abi/            Typed ABIs: onboardingRouter, GSMRouter, ERC20, ERC4626
   config/         addresses.ts, chains.ts, tokens.ts, wagmi.ts
   hooks/          useTokenBalances, useAllowance, useApprove, useDeposit, useRedeem,
                   usePreviewDeposit, usePreviewRedeem, useNetworkGuard, useFaucet, useMounted
@@ -72,7 +67,7 @@ src/
   types/          Shared TypeScript types
 scripts/
   faucet.sh       Drip test tokens on Anvil fork via cast impersonation
-  deploy-local.sh Deploy GSMRouter + sGHORouter to Anvil fork, writes .env.local
+  deploy-local.sh Deploy GSMRouter to Anvil fork, writes .env.local
 tests/
   unit/           Vitest: error parsing, validation, formatting
   e2e/            Playwright: deposit/redeem UI flows
@@ -115,7 +110,7 @@ npm run dev
 - `useMounted()` hook gates all wallet-dependent rendering to prevent SSR hydration mismatches. Always use `const connected = mounted && isConnected` instead of raw `isConnected` in page-level components.
 - ConnectKit 1.9 peers on wagmi 2.x — do not upgrade wagmi to 3.x until ConnectKit supports it.
 - The faucet (both `scripts/faucet.sh` and `src/lib/faucet.ts`) uses Anvil's `anvil_impersonateAccount` to transfer tokens from mainnet whales (Binance for USDC/USDT, Aave Treasury for GHO). The UI faucet panel only renders when `targetChain.id === 31337`.
-- sGHORouter uses exact approvals, not unlimited. Each new deposit amount may require a fresh ERC20 approval.
+- GSMRouter uses exact approvals, not unlimited. Each new deposit amount may require a fresh ERC20 approval.
 - USDC/USDT deposits route through GSMRouter (which wraps into stataTokens then sells via GSM). GHO deposits go directly into the sGHO ERC4626 vault.
 - The `deploy-local.sh` script uses Anvil default private key #0 (`0xac0974...`) and writes deployed addresses into `.env.local`.
 

@@ -1,6 +1,6 @@
 # sGHO Router Frontend
 
-A Next.js frontend for depositing and redeeming sGHO shares using GHO, USDC, or USDT through the sGHORouter smart contract.
+A Next.js frontend for depositing and redeeming sGHO shares using GHO, USDC, or USDT through router contracts.
 
 ## Supported Assets
 
@@ -16,7 +16,7 @@ A Next.js frontend for depositing and redeeming sGHO shares using GHO, USDC, or 
 ```
 src/
   app/           Layout, page, providers (Next.js App Router)
-  abi/           Typed ABIs for sGHORouter, GSMRouter, ERC20, ERC4626
+  abi/           Typed ABIs for onboarding router, GSMRouter, ERC20, ERC4626
   config/        Contract addresses (env-driven), chain config, token metadata, wagmi config
   hooks/         React hooks for balances, allowances, previews, deposits, redeems, network guard
   components/    UI components: forms, token selector, previews, transaction status, error display
@@ -29,9 +29,9 @@ tests/
 
 ### Data Flow
 
-**Deposit:** User selects token + amount -> preview via GSMRouter.previewSwapToGHO + sGHO.previewDeposit -> approve token (if needed) -> sGHORouter.deposit() -> watch Deposited event -> refresh balances.
+**Deposit:** User selects token + amount -> preview via GSMRouter.previewSwapToGHO + sGHO.previewDeposit -> approve token (if needed) -> router.deposit() -> watch Deposited event -> refresh balances.
 
-**Redeem:** User enters sGHO shares + output token -> preview via sGHO.previewRedeem + GSMRouter.previewSwapFromGHO -> approve sGHO (if needed) -> sGHORouter.redeem() -> watch Redeemed event -> refresh balances.
+**Redeem:** User enters sGHO shares + output token -> preview via sGHO.previewRedeem + GSMRouter.previewSwapFromGHO -> approve sGHO (if needed) -> router.redeem() -> watch Redeemed event -> refresh balances.
 
 ## Setup
 
@@ -59,7 +59,6 @@ cp .env.example .env.local
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | WalletConnect Cloud project ID | Yes |
-| `NEXT_PUBLIC_SGHO_ROUTER_ADDRESS` | Deployed sGHORouter address | Yes |
 | `NEXT_PUBLIC_GSM_ROUTER_ADDRESS` | Deployed GSMRouter address | Yes |
 | `NEXT_PUBLIC_SGHO_ADDRESS` | sGHO vault address | Yes |
 | `NEXT_PUBLIC_GHO_ADDRESS` | GHO token address | Has mainnet default |
@@ -87,7 +86,7 @@ anvil --fork-url https://eth.llamarpc.com --chain-id 31337
 
 ```bash
 cd ../contracts
-forge script script/DeploySGHORouter.s.sol --rpc-url http://127.0.0.1:8545 --broadcast
+forge script script/DeployGSMRouter.s.sol --rpc-url http://127.0.0.1:8545 --broadcast
 ```
 
 3. Update `.env.local` with the deployed addresses and set `NEXT_PUBLIC_CHAIN_ID=31337`.
@@ -120,7 +119,6 @@ TENDERLY_ADMIN_RPC_URL=<TENDERLY_ADMIN_RPC_URL>
 
 3. Deploy contracts to Tenderly RPC and set:
    - `NEXT_PUBLIC_GSM_ROUTER_ADDRESS`
-   - `NEXT_PUBLIC_SGHO_ROUTER_ADDRESS`
    - `NEXT_PUBLIC_SGHO_ADDRESS`
 
 4. Start the app:
@@ -169,7 +167,7 @@ UI-level tests run against the dev server. Integration tests requiring wallet in
 4. Adjust slippage tolerance if needed (default 0.5%).
 5. Click Deposit. If approval is needed, the UI shows a two-step flow:
    - Step 1: Approve token spending (exact amount, not unlimited).
-   - Step 2: Execute deposit via sGHORouter.
+   - Step 2: Execute deposit via the router contract.
 6. Transaction status updates in real-time (pending, confirming, success/error).
 7. On success: Deposited event details shown, balances refresh.
 
@@ -200,7 +198,7 @@ User wallet rejections are detected and shown as dismissible warnings.
 
 - USDC/USDT deposits route through GSM, which charges a fee. The preview accounts for this.
 - stataToken interest accrual between preview and execution can cause minor output drift -- slippage tolerance protects against this.
-- sGHORouter and GSMRouter addresses must be set before the app is functional. Zero-address defaults will cause transactions to fail.
+- `NEXT_PUBLIC_GSM_ROUTER_ADDRESS` must be set before the app is functional. Zero-address defaults will cause transactions to fail.
 - The router uses exact approvals (not unlimited) for security. Each new deposit amount may require a fresh approval if the previous one was consumed.
 
 ## License

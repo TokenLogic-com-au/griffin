@@ -9,6 +9,7 @@ import {IGSMRouter} from "src/interfaces/onboarding/IGSMRouter.sol";
 
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockGSMWithFees} from "test/mocks/MockGSMWithFees.sol";
+import {MockSGHO} from "test/mocks/MockSGHO.sol";
 import {MockStaticATokenWithRate} from "test/mocks/MockStaticATokenWithRate.sol";
 
 /**
@@ -19,28 +20,36 @@ contract GSMRouterAdvancedTest is Test {
     GSMRouter public router;
 
     address public USDC;
+    address public USDT;
     address public GHO;
+    address public SGHO;
     address public STATA_USDC;
+    address public STATA_USDT;
     address public GSM_USDC;
+    address public GSM_USDT;
 
     MockGSMWithFees internal gsmUsdcWithFees;
     MockStaticATokenWithRate internal stataUsdcWithRate;
 
     function _setUp(uint256 feeBps, uint256 liquidity) internal {
         USDC = address(new MockERC20("USDC", "USDC", 6));
+        USDT = address(new MockERC20("USDT", "USDT", 6));
         GHO = address(new MockERC20("GHO", "GHO", 18));
 
         stataUsdcWithRate = new MockStaticATokenWithRate("stataUSDC", "stataUSDC", 6, USDC);
         STATA_USDC = address(stataUsdcWithRate);
+        STATA_USDT = address(new MockStaticATokenWithRate("stataUSDT", "stataUSDT", 6, USDT));
 
         gsmUsdcWithFees = new MockGSMWithFees(STATA_USDC, GHO, feeBps);
         GSM_USDC = address(gsmUsdcWithFees);
+        GSM_USDT = address(new MockGSMWithFees(STATA_USDT, GHO, feeBps));
 
         MockERC20(GHO).mint(GSM_USDC, liquidity);
         stataUsdcWithRate.mint(GSM_USDC, liquidity);
         MockERC20(USDC).mint(STATA_USDC, liquidity);
 
-        router = new GSMRouter(address(this), GHO);
+        SGHO = address(new MockSGHO(GHO));
+        router = new GSMRouter(address(this), GHO, SGHO, GSM_USDC, GSM_USDT);
     }
 }
 
@@ -53,53 +62,55 @@ contract FeeHandlingTest is GSMRouterAdvancedTest {
         _setUp(50, 100_000_000 * 1e18); // 0.5% fee
     }
 
-    function test_swapToGHO_withFee() public {
+    function test_swap_to_gho_with_fee() public {
         uint256 amount = 1000 * 1e6; // 1000 USDC
+        uint256 expectedFee = (amount * 50) / 10000;
+        uint256 expectedGho = amount - expectedFee;
 
         MockERC20(USDC).mint(address(this), amount);
         IERC20(USDC).approve(address(router), amount);
 
-        uint256 ghoReceived = router.swapToGHO(GSM_USDC, amount, 0);
-
-        uint256 expectedFee = (amount * 50) / 10000;
-        uint256 expectedGho = amount - expectedFee;
+        vm.expectEmit(true, true, false, true);
+        emit IGSMRouter.SwapToGHO(address(this), USDC, amount, expectedGho);
+        uint256 ghoReceived = router.swapToGHO(USDC, amount, 0);
 
         assertEq(ghoReceived, expectedGho, "Should receive GHO minus fee");
     }
 
-    function test_swapFromGHO_withFee() public {
+    function test_swap_from_gho_with_fee() public {
         uint256 ghoAmount = 1000 * 1e18; // 1000 GHO
+        uint256 expectedFee = (ghoAmount * 50) / 10000;
+        uint256 expectedUsdc = ghoAmount - expectedFee;
 
         MockERC20(GHO).mint(address(this), ghoAmount);
         IERC20(GHO).approve(address(router), ghoAmount);
 
-        uint256 usdcReceived = router.swapFromGHO(GSM_USDC, ghoAmount, 0);
-
-        uint256 expectedFee = (ghoAmount * 50) / 10000;
-        uint256 expectedUsdc = ghoAmount - expectedFee;
+        vm.expectEmit(true, true, false, true);
+        emit IGSMRouter.SwapFromGHO(address(this), USDC, ghoAmount, expectedUsdc);
+        uint256 usdcReceived = router.swapFromGHO(USDC, ghoAmount, 0);
 
         assertEq(usdcReceived, expectedUsdc, "Should receive USDC minus fee");
     }
 
-    function test_previewSwapToGHO_withFee() public view {
+    function test_preview_swap_to_gho_with_fee() public view {
         uint256 amount = 1000 * 1e6;
 
-        (uint256 ghoAmount, uint256 fee) = router.previewSwapToGHO(GSM_USDC, amount);
+        (uint256 ghoAmount, uint256 fee) = router.previewSwapToGHO(USDC, amount);
 
         assertEq(fee, (amount * 50) / 10000, "Fee should be 0.5%");
         assertEq(ghoAmount, amount - fee, "GHO amount should be input minus fee");
     }
 
-    function test_previewSwapFromGHO_withFee() public view {
+    function test_preview_swap_from_gho_with_fee() public view {
         uint256 ghoAmount = 1000 * 1e18;
 
-        (uint256 assetAmount, uint256 fee) = router.previewSwapFromGHO(GSM_USDC, ghoAmount);
+        (uint256 assetAmount, uint256 fee) = router.previewSwapFromGHO(USDC, ghoAmount);
 
         assertEq(fee, (ghoAmount * 50) / 10000, "Fee should be 0.5%");
         assertEq(assetAmount, ghoAmount - fee, "Asset amount should be input minus fee");
     }
 
-    function test_fuzz_swapToGHO_withVariableFees(uint256 amount, uint256 feeBps) public {
+    function test_fuzz_swap_to_gho_with_variable_fees(uint256 amount, uint256 feeBps) public {
         amount = bound(amount, 1e6, 1_000_000 * 1e6);
         feeBps = bound(feeBps, 1, 500); // 0.01% to 5%
 
@@ -108,7 +119,7 @@ contract FeeHandlingTest is GSMRouterAdvancedTest {
         MockERC20(USDC).mint(address(this), amount);
         IERC20(USDC).approve(address(router), amount);
 
-        uint256 ghoReceived = router.swapToGHO(GSM_USDC, amount, 0);
+        uint256 ghoReceived = router.swapToGHO(USDC, amount, 0);
 
         uint256 expectedFee = (amount * feeBps) / 10000;
         uint256 expectedGho = amount - expectedFee;
@@ -116,7 +127,7 @@ contract FeeHandlingTest is GSMRouterAdvancedTest {
         assertEq(ghoReceived, expectedGho, "GHO received should match expected after fee");
     }
 
-    function test_slippageProtection_withFees() public {
+    function test_slippage_protection_with_fees() public {
         uint256 amount = 1000 * 1e6;
         gsmUsdcWithFees.setFeeBps(100); // 1% fee
 
@@ -124,7 +135,7 @@ contract FeeHandlingTest is GSMRouterAdvancedTest {
         IERC20(USDC).approve(address(router), amount);
 
         vm.expectRevert(IGSMRouter.SlippageExceeded.selector);
-        router.swapToGHO(GSM_USDC, amount, 995 * 1e6);
+        router.swapToGHO(USDC, amount, 995 * 1e6);
     }
 }
 
@@ -137,29 +148,29 @@ contract RoundingTest is GSMRouterAdvancedTest {
         _setUp(0, type(uint128).max); // No fee
     }
 
-    function test_swapToGHO_minimumAmount() public {
+    function test_swap_to_gho_minimum_amount() public {
         uint256 amount = 1; // 1 wei of USDC
 
         MockERC20(USDC).mint(address(this), amount);
         IERC20(USDC).approve(address(router), amount);
 
-        uint256 ghoReceived = router.swapToGHO(GSM_USDC, amount, 0);
+        uint256 ghoReceived = router.swapToGHO(USDC, amount, 0);
 
         assertGt(ghoReceived, 0, "Should receive some GHO even for 1 wei");
     }
 
-    function test_swapFromGHO_minimumAmount() public {
+    function test_swap_from_gho_minimum_amount() public {
         uint256 ghoAmount = 1; // 1 wei of GHO
 
         MockERC20(GHO).mint(address(this), ghoAmount);
         IERC20(GHO).approve(address(router), ghoAmount);
 
-        uint256 usdcReceived = router.swapFromGHO(GSM_USDC, ghoAmount, 0);
+        uint256 usdcReceived = router.swapFromGHO(USDC, ghoAmount, 0);
 
         assertLe(usdcReceived, ghoAmount, "Should not receive more than input");
     }
 
-    function test_rounding_withNonUnityExchangeRate() public {
+    function test_rounding_with_non_unity_exchange_rate() public {
         stataUsdcWithRate.setExchangeRate(1.05e18);
 
         uint256 amount = 1000 * 1e6;
@@ -167,13 +178,13 @@ contract RoundingTest is GSMRouterAdvancedTest {
         MockERC20(USDC).mint(address(this), amount);
         IERC20(USDC).approve(address(router), amount);
 
-        uint256 ghoReceived = router.swapToGHO(GSM_USDC, amount, 0);
+        uint256 ghoReceived = router.swapToGHO(USDC, amount, 0);
 
         uint256 expectedShares = (amount * 1e18) / 1.05e18;
         assertApproxEqRel(ghoReceived, expectedShares, 0.01e18, "Should match expected shares calculation");
     }
 
-    function test_fuzz_rounding_noValueLeak(uint256 amount) public {
+    function test_fuzz_rounding_no_value_leak(uint256 amount) public {
         amount = bound(amount, 1, 10_000_000 * 1e6);
 
         uint256 initialUsdcBalance = MockERC20(USDC).balanceOf(address(this));
@@ -181,16 +192,16 @@ contract RoundingTest is GSMRouterAdvancedTest {
         MockERC20(USDC).mint(address(this), amount);
         IERC20(USDC).approve(address(router), amount);
 
-        uint256 ghoReceived = router.swapToGHO(GSM_USDC, amount, 0);
+        uint256 ghoReceived = router.swapToGHO(USDC, amount, 0);
 
         IERC20(GHO).approve(address(router), ghoReceived);
-        uint256 usdcBack = router.swapFromGHO(GSM_USDC, ghoReceived, 0);
+        uint256 usdcBack = router.swapFromGHO(USDC, ghoReceived, 0);
 
         assertLe(usdcBack, amount, "Should not create value from round-trip");
         assertEq(MockERC20(USDC).balanceOf(address(this)), initialUsdcBalance + usdcBack, "Balance accounting correct");
     }
 
-    function test_extremeExchangeRate_high() public {
+    function test_extreme_exchange_rate_high() public {
         stataUsdcWithRate.setExchangeRate(1.1e18);
 
         uint256 amount = 1000 * 1e6;
@@ -198,13 +209,13 @@ contract RoundingTest is GSMRouterAdvancedTest {
         MockERC20(USDC).mint(address(this), amount);
         IERC20(USDC).approve(address(router), amount);
 
-        uint256 ghoReceived = router.swapToGHO(GSM_USDC, amount, 0);
+        uint256 ghoReceived = router.swapToGHO(USDC, amount, 0);
 
         uint256 expectedShares = (amount * 10) / 11;
         assertEq(ghoReceived, expectedShares, "Should correctly handle high exchange rate");
     }
 
-    function test_extremeExchangeRate_low() public {
+    function test_extreme_exchange_rate_low() public {
         stataUsdcWithRate.setExchangeRate(0.95e18);
 
         uint256 amount = 1000 * 1e6;
@@ -212,7 +223,7 @@ contract RoundingTest is GSMRouterAdvancedTest {
         MockERC20(USDC).mint(address(this), amount);
         IERC20(USDC).approve(address(router), amount);
 
-        uint256 ghoReceived = router.swapToGHO(GSM_USDC, amount, 0);
+        uint256 ghoReceived = router.swapToGHO(USDC, amount, 0);
 
         uint256 expectedShares = (amount * 100) / 95;
         assertEq(ghoReceived, expectedShares, "Should correctly handle low exchange rate");
@@ -228,17 +239,17 @@ contract InterestAccrualTest is GSMRouterAdvancedTest {
         _setUp(0, 100_000_000 * 1e18);
     }
 
-    function test_previewVsActual_withInterestAccrual() public {
+    function test_preview_vs_actual_with_interest_accrual() public {
         uint256 amount = 1000 * 1e6;
 
-        (uint256 previewGho,) = router.previewSwapToGHO(GSM_USDC, amount);
+        (uint256 previewGho,) = router.previewSwapToGHO(USDC, amount);
 
         stataUsdcWithRate.setExchangeRate(1.001e18);
 
         MockERC20(USDC).mint(address(this), amount);
         IERC20(USDC).approve(address(router), amount);
 
-        uint256 actualGho = router.swapToGHO(GSM_USDC, amount, 0);
+        uint256 actualGho = router.swapToGHO(USDC, amount, 0);
 
         assertLt(actualGho, previewGho, "Actual should be less after rate increase");
 
@@ -246,7 +257,7 @@ contract InterestAccrualTest is GSMRouterAdvancedTest {
         assertApproxEqRel(diff, previewGho / 1000, 0.1e18, "Difference should be ~0.1%");
     }
 
-    function test_interestAccrual_benefitsRedeemer() public {
+    function test_interest_accrual_benefits_redeemer() public {
         uint256 ghoAmount = 1000 * 1e18;
 
         MockERC20(GHO).mint(address(this), ghoAmount);
@@ -254,12 +265,12 @@ contract InterestAccrualTest is GSMRouterAdvancedTest {
 
         stataUsdcWithRate.setExchangeRate(1.05e18);
 
-        uint256 usdcReceived = router.swapFromGHO(GSM_USDC, ghoAmount, 0);
+        uint256 usdcReceived = router.swapFromGHO(USDC, ghoAmount, 0);
 
         assertGt(usdcReceived, ghoAmount, "Should receive more USDC due to interest");
     }
 
-    function test_fuzz_interestAccrual_simulation(uint256 amount, uint256 rateBps) public {
+    function test_fuzz_interest_accrual_simulation(uint256 amount, uint256 rateBps) public {
         amount = bound(amount, 1e6, 10_000_000 * 1e6);
         rateBps = bound(rateBps, 10000, 12000);
 
@@ -269,16 +280,16 @@ contract InterestAccrualTest is GSMRouterAdvancedTest {
         MockERC20(USDC).mint(address(this), amount);
         IERC20(USDC).approve(address(router), amount);
 
-        (uint256 previewGho,) = router.previewSwapToGHO(GSM_USDC, amount);
-        uint256 actualGho = router.swapToGHO(GSM_USDC, amount, 0);
+        (uint256 previewGho,) = router.previewSwapToGHO(USDC, amount);
+        uint256 actualGho = router.swapToGHO(USDC, amount, 0);
 
         assertEq(actualGho, previewGho, "Preview should match actual at same rate");
     }
 
-    function test_rateChange_betweenPreviewAndExecution() public {
+    function test_rate_change_between_preview_and_execution() public {
         uint256 amount = 10_000 * 1e6;
 
-        (uint256 previewGho,) = router.previewSwapToGHO(GSM_USDC, amount);
+        (uint256 previewGho,) = router.previewSwapToGHO(USDC, amount);
 
         stataUsdcWithRate.setExchangeRate(1.02e18);
 
@@ -286,10 +297,10 @@ contract InterestAccrualTest is GSMRouterAdvancedTest {
         IERC20(USDC).approve(address(router), amount);
 
         vm.expectRevert(IGSMRouter.SlippageExceeded.selector);
-        router.swapToGHO(GSM_USDC, amount, previewGho);
+        router.swapToGHO(USDC, amount, previewGho);
 
         uint256 minWithBuffer = (previewGho * 97) / 100;
-        uint256 actualGho = router.swapToGHO(GSM_USDC, amount, minWithBuffer);
+        uint256 actualGho = router.swapToGHO(USDC, amount, minWithBuffer);
 
         assertGe(actualGho, minWithBuffer, "Should succeed with buffer");
     }
@@ -304,7 +315,7 @@ contract ConcurrentUserTest is GSMRouterAdvancedTest {
         _setUp(10, type(uint128).max); // 0.1% fee
     }
 
-    function test_fuzz_multipleUsers_swapToGHO(uint256 amount1, uint256 amount2, uint256 amount3) public {
+    function test_fuzz_multiple_users_swap_to_gho(uint256 amount1, uint256 amount2, uint256 amount3) public {
         amount1 = bound(amount1, 1e6, 1_000_000 * 1e6);
         amount2 = bound(amount2, 1e6, 1_000_000 * 1e6);
         amount3 = bound(amount3, 1e6, 1_000_000 * 1e6);
@@ -319,17 +330,17 @@ contract ConcurrentUserTest is GSMRouterAdvancedTest {
 
         vm.startPrank(user1);
         IERC20(USDC).approve(address(router), amount1);
-        uint256 gho1 = router.swapToGHO(GSM_USDC, amount1, 0);
+        uint256 gho1 = router.swapToGHO(USDC, amount1, 0);
         vm.stopPrank();
 
         vm.startPrank(user2);
         IERC20(USDC).approve(address(router), amount2);
-        uint256 gho2 = router.swapToGHO(GSM_USDC, amount2, 0);
+        uint256 gho2 = router.swapToGHO(USDC, amount2, 0);
         vm.stopPrank();
 
         vm.startPrank(user3);
         IERC20(USDC).approve(address(router), amount3);
-        uint256 gho3 = router.swapToGHO(GSM_USDC, amount3, 0);
+        uint256 gho3 = router.swapToGHO(USDC, amount3, 0);
         vm.stopPrank();
 
         assertEq(MockERC20(GHO).balanceOf(user1), gho1, "User1 should have their GHO");
@@ -341,7 +352,7 @@ contract ConcurrentUserTest is GSMRouterAdvancedTest {
         assertEq(MockERC20(USDC).balanceOf(user3), 0, "User3 should have spent all USDC");
     }
 
-    function test_mixedOperations_concurrent() public {
+    function test_mixed_operations_concurrent() public {
         uint256 toGhoAmount = 10_000 * 1e6;
         uint256 fromGhoAmount = 5_000 * 1e18;
 
@@ -353,12 +364,12 @@ contract ConcurrentUserTest is GSMRouterAdvancedTest {
 
         vm.startPrank(user1);
         IERC20(USDC).approve(address(router), toGhoAmount);
-        uint256 gho1 = router.swapToGHO(GSM_USDC, toGhoAmount, 0);
+        uint256 gho1 = router.swapToGHO(USDC, toGhoAmount, 0);
         vm.stopPrank();
 
         vm.startPrank(user2);
         IERC20(GHO).approve(address(router), fromGhoAmount);
-        uint256 usdc2 = router.swapFromGHO(GSM_USDC, fromGhoAmount, 0);
+        uint256 usdc2 = router.swapFromGHO(USDC, fromGhoAmount, 0);
         vm.stopPrank();
 
         assertEq(MockERC20(GHO).balanceOf(user1), gho1, "User1 should have GHO");
@@ -370,7 +381,7 @@ contract ConcurrentUserTest is GSMRouterAdvancedTest {
         assertGt(usdc2, 0, "User2 should have received USDC");
     }
 
-    function test_fuzz_independentUserSwapsToGHO(uint256 amount1, uint256 amount2) public {
+    function test_fuzz_independent_user_swaps_to_gho(uint256 amount1, uint256 amount2) public {
         amount1 = bound(amount1, 1e6, 100_000 * 1e6);
         amount2 = bound(amount2, 1e6, 100_000 * 1e6);
 
@@ -382,12 +393,12 @@ contract ConcurrentUserTest is GSMRouterAdvancedTest {
 
         vm.startPrank(user1);
         IERC20(USDC).approve(address(router), amount1);
-        uint256 gho1 = router.swapToGHO(GSM_USDC, amount1, 0);
+        uint256 gho1 = router.swapToGHO(USDC, amount1, 0);
         vm.stopPrank();
 
         vm.startPrank(user2);
         IERC20(USDC).approve(address(router), amount2);
-        uint256 gho2 = router.swapToGHO(GSM_USDC, amount2, 0);
+        uint256 gho2 = router.swapToGHO(USDC, amount2, 0);
         vm.stopPrank();
 
         assertEq(MockERC20(GHO).balanceOf(user1), gho1, "User1 GHO balance");
@@ -396,7 +407,7 @@ contract ConcurrentUserTest is GSMRouterAdvancedTest {
         assertEq(MockERC20(USDC).balanceOf(user2), 0, "User2 spent all USDC");
     }
 
-    function test_fuzz_stressTest_manyUsers(uint8 numUsers) public {
+    function test_fuzz_stress_test_many_users(uint8 numUsers) public {
         numUsers = uint8(bound(numUsers, 5, 50));
 
         uint256[] memory amounts = new uint256[](numUsers);
@@ -412,7 +423,7 @@ contract ConcurrentUserTest is GSMRouterAdvancedTest {
         for (uint256 i = 0; i < numUsers; i++) {
             vm.startPrank(users[i]);
             IERC20(USDC).approve(address(router), amounts[i]);
-            received[i] = router.swapToGHO(GSM_USDC, amounts[i], 0);
+            received[i] = router.swapToGHO(USDC, amounts[i], 0);
             vm.stopPrank();
         }
 
@@ -456,9 +467,7 @@ contract InvariantHandler is Test {
 
         vm.startPrank(actor);
         IERC20(usdc).approve(address(router), amount);
-
-        try router.swapToGHO(address(gsm), amount, 0) {} catch {}
-
+        router.swapToGHO(usdc, amount, 0);
         vm.stopPrank();
     }
 
@@ -470,9 +479,7 @@ contract InvariantHandler is Test {
 
         vm.startPrank(actor);
         IERC20(gho).approve(address(router), amount);
-
-        try router.swapFromGHO(address(gsm), amount, 0) {} catch {}
-
+        router.swapFromGHO(usdc, amount, 0);
         vm.stopPrank();
     }
 
@@ -493,13 +500,13 @@ contract InvariantTest is GSMRouterAdvancedTest {
         targetContract(address(handler));
     }
 
-    function invariant_routerHoldsNoTokens() public view {
+    function invariant_router_holds_no_tokens() public view {
         assertEq(MockERC20(USDC).balanceOf(address(router)), 0, "Router should hold no USDC");
         assertEq(MockERC20(GHO).balanceOf(address(router)), 0, "Router should hold no GHO");
         assertEq(stataUsdcWithRate.balanceOf(address(router)), 0, "Router should hold no stataUSDC");
     }
 
-    function invariant_noResidualApprovals() public view {
+    function invariant_no_residual_approvals() public view {
         assertEq(IERC20(USDC).allowance(address(router), STATA_USDC), 0, "No residual USDC approval");
         assertEq(IERC20(GHO).allowance(address(router), GSM_USDC), 0, "No residual GHO approval");
         assertEq(stataUsdcWithRate.allowance(address(router), GSM_USDC), 0, "No residual stataUSDC approval");
@@ -515,7 +522,7 @@ contract PartialConsumptionTest is GSMRouterAdvancedTest {
         _setUp(0, type(uint128).max);
     }
 
-    function test_swapToGHO_withPartialConsumption() public {
+    function test_swap_to_gho_with_partial_consumption() public {
         // Set GSM to only consume 95% of input
         gsmUsdcWithFees.setConsumptionBps(9500);
 
@@ -524,7 +531,7 @@ contract PartialConsumptionTest is GSMRouterAdvancedTest {
         MockERC20(USDC).mint(address(this), amount);
         IERC20(USDC).approve(address(router), amount);
 
-        router.swapToGHO(GSM_USDC, amount, 0);
+        router.swapToGHO(USDC, amount, 0);
 
         // Router should have no tokens
         assertEq(MockERC20(USDC).balanceOf(address(router)), 0, "Router should hold no USDC");
@@ -537,7 +544,7 @@ contract PartialConsumptionTest is GSMRouterAdvancedTest {
         assertEq(dustReceived, expectedDust, "User should receive 5% dust back");
     }
 
-    function test_swapFromGHO_withPartialConsumption() public {
+    function test_swap_from_gho_with_partial_consumption() public {
         // Set GSM to only consume 95% of GHO
         gsmUsdcWithFees.setConsumptionBps(9500);
 
@@ -546,7 +553,7 @@ contract PartialConsumptionTest is GSMRouterAdvancedTest {
         MockERC20(GHO).mint(address(this), ghoAmount);
         IERC20(GHO).approve(address(router), ghoAmount);
 
-        router.swapFromGHO(GSM_USDC, ghoAmount, 0);
+        router.swapFromGHO(USDC, ghoAmount, 0);
 
         // Router should have no tokens
         assertEq(MockERC20(USDC).balanceOf(address(router)), 0, "Router should hold no USDC");
@@ -558,7 +565,7 @@ contract PartialConsumptionTest is GSMRouterAdvancedTest {
         assertGt(finalGhoBalance, 0, "User should receive GHO dust back");
     }
 
-    function test_noResidualAllowances_afterPartialConsumption() public {
+    function test_no_residual_allowances_after_partial_consumption() public {
         gsmUsdcWithFees.setConsumptionBps(9500);
 
         uint256 amount = 1000 * 1e6;
@@ -566,14 +573,14 @@ contract PartialConsumptionTest is GSMRouterAdvancedTest {
         MockERC20(USDC).mint(address(this), amount);
         IERC20(USDC).approve(address(router), amount);
 
-        router.swapToGHO(GSM_USDC, amount, 0);
+        router.swapToGHO(USDC, amount, 0);
 
         // No residual allowances
         assertEq(IERC20(USDC).allowance(address(router), STATA_USDC), 0, "No residual USDC approval");
         assertEq(stataUsdcWithRate.allowance(address(router), GSM_USDC), 0, "No residual stataUSDC approval");
     }
 
-    function test_fuzz_partialConsumption_noResiduals(uint256 amount, uint256 consumptionBps) public {
+    function test_fuzz_partial_consumption_no_residuals(uint256 amount, uint256 consumptionBps) public {
         amount = bound(amount, 1e6, 1_000_000 * 1e6);
         consumptionBps = bound(consumptionBps, 9000, 10000); // 90% to 100%
 
@@ -582,7 +589,7 @@ contract PartialConsumptionTest is GSMRouterAdvancedTest {
         MockERC20(USDC).mint(address(this), amount);
         IERC20(USDC).approve(address(router), amount);
 
-        router.swapToGHO(GSM_USDC, amount, 0);
+        router.swapToGHO(USDC, amount, 0);
 
         // Router should never hold any tokens
         assertEq(MockERC20(USDC).balanceOf(address(router)), 0, "Router should hold no USDC");
@@ -594,7 +601,7 @@ contract PartialConsumptionTest is GSMRouterAdvancedTest {
         assertEq(stataUsdcWithRate.allowance(address(router), GSM_USDC), 0, "No residual stataUSDC approval");
     }
 
-    function test_dustReturnedEvent_emitted() public {
+    function test_dust_returned_event_emitted() public {
         gsmUsdcWithFees.setConsumptionBps(9500);
 
         uint256 amount = 1000 * 1e6;
@@ -605,7 +612,7 @@ contract PartialConsumptionTest is GSMRouterAdvancedTest {
         vm.expectEmit(true, true, false, false);
         emit IGSMRouter.DustReturned(address(this), USDC, 0); // Amount checked loosely
 
-        router.swapToGHO(GSM_USDC, amount, 0);
+        router.swapToGHO(USDC, amount, 0);
     }
 }
 
@@ -614,7 +621,7 @@ contract SlippageInvariantTest is GSMRouterAdvancedTest {
         _setUp(50, 100_000_000 * 1e18); // 0.5% fee
     }
 
-    function test_fuzz_outputAlwaysGteMinAmount(uint256 amount, uint256 minAmount) public {
+    function test_fuzz_output_always_gte_min_amount(uint256 amount, uint256 minAmount) public {
         amount = bound(amount, 1e6, 1_000_000 * 1e6);
 
         MockERC20(USDC).mint(address(this), amount);
@@ -625,9 +632,9 @@ contract SlippageInvariantTest is GSMRouterAdvancedTest {
 
         if (minAmount > expectedOutput) {
             vm.expectRevert(IGSMRouter.SlippageExceeded.selector);
-            router.swapToGHO(GSM_USDC, amount, minAmount);
+            router.swapToGHO(USDC, amount, minAmount);
         } else {
-            uint256 output = router.swapToGHO(GSM_USDC, amount, minAmount);
+            uint256 output = router.swapToGHO(USDC, amount, minAmount);
             assertGe(output, minAmount, "Output must be >= minAmount");
         }
     }

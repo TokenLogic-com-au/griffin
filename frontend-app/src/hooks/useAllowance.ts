@@ -6,7 +6,7 @@ import { addresses } from "@/config/addresses";
 import type { Address } from "viem";
 
 /**
- * Read the ERC20 allowance for `tokenAddress` granted to the sGHORouter
+ * Read the ERC20 allowance for `tokenAddress` granted to the router
  * by the connected wallet.
  */
 export function useAllowance(tokenAddress: Address | undefined) {
@@ -16,7 +16,7 @@ export function useAllowance(tokenAddress: Address | undefined) {
     address: tokenAddress,
     abi: erc20Abi,
     functionName: "allowance",
-    args: account ? [account, addresses.sGHORouter] : undefined,
+    args: account ? [account, addresses.gsmRouter] : undefined,
     query: {
       enabled: !!account && !!tokenAddress,
       refetchInterval: 10_000,
@@ -32,7 +32,7 @@ export function useAllowance(tokenAddress: Address | undefined) {
 }
 
 /**
- * Read the sGHO allowance granted to the sGHORouter for redeem operations.
+ * Read the sGHO allowance granted to the router for redeem operations.
  * sGHO uses ERC4626 which inherits ERC20 approval.
  */
 export function useSGHOAllowance() {

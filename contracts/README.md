@@ -152,6 +152,8 @@ await tx.wait();
 4. **Reentrancy Safe**: No state changes after external calls
 5. **Error Handling**: Clear, descriptive error messages
 
+See also: [`SECURITY_ASSUMPTIONS.md`](./SECURITY_ASSUMPTIONS.md) for documented failure modes and explicit trust assumptions (yield variance, GSM liquidity, downstream dependencies, dynamic GSM fees).
+
 ### Known Considerations
 
 - stataToken addresses need verification against production GSM contracts

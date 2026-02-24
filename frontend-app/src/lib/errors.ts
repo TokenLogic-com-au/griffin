@@ -1,13 +1,13 @@
 import { BaseError, ContractFunctionRevertedError } from "viem";
-import { sGHORouterAbi } from "@/abi/sGHORouter";
+import { onboardingRouterAbi } from "@/abi/onboardingRouter";
 import { gsmRouterAbi } from "@/abi/gsmRouter";
 
 /**
- * Known custom error names from sGHORouter and GSMRouter,
+ * Known custom error names from onboarding and GSM router contracts,
  * mapped to user-friendly messages.
  */
 const ERROR_MESSAGES: Record<string, string> = {
-  // sGHORouter errors
+  // Onboarding router errors
   ZeroAddress:
     "A required contract address is missing. The router may not be configured correctly.",
   InvalidToken:
@@ -104,5 +104,5 @@ export function parseError(error: unknown): ParsedError {
  * Get the ABIs that contain known custom errors for decoding.
  */
 export function getErrorAbis() {
-  return [...sGHORouterAbi, ...gsmRouterAbi];
+  return [...onboardingRouterAbi, ...gsmRouterAbi];
 }
