@@ -21,9 +21,102 @@ The router depends on external contracts for pricing, liquidity, and settlement:
 - Two GSM routes (`GSM_USDC`, `GSM_USDT`)
 - Their underlying `staticAToken` wrappers
 - `sGHO` ERC4626 vault (for `swapTosGHO` and `swapFromsGHO`)
-- ERC20 tokens (GHO and route underlyings)
+- ERC20 tokens (GHO and underlyings like USDC, USDT)
 
 The router keeps no per-user accounting state. It is a transient orchestration layer.
+
+## Security assumptions
+
+The current design assumes:
+
+1. GSM, staticAToken, sGHO, and token dependencies are non-malicious and interface-compatible.
+2. Supported routes maintain sufficient liquidity/capacity for intended trade sizes.
+3. Integrators and users set realistic slippage bounds for write calls.
+4. Downstream upgrades, pauses, and parameter changes are actively monitored.
+5. Router ownership is trusted to use `rescueToken` only for operational recovery.
+6. Integrators must treat preview functions as estimates, not execution guarantees.
+7. `sGHO` `previewRedeem` and `redeem` semantics remain ERC4626-compatible over time.
+
+## Explicit dependency map
+
+### Upstream / downstream overview
+
+```
+                        ┌──────────────────────┐
+                        │   Callers (Users,     │
+                        │   Integrators,        │   UPSTREAM
+                        │   Frontend)           │
+                        └──────────┬───────────┘
+                                   │
+                      ERC20 tokens in / out
+                                   │
+                                   ▼
+                   ┌───────────────────────────────┐
+                   │           GSMRouter            │
+                   │   (stateless orchestration)    │
+                   └──┬────────────┬────────────┬──┘
+                      │            │            │
+                      ▼            ▼            ▼      DOWNSTREAM
+              ┌────────────┐ ┌──────────┐ ┌──────────┐
+              │ staticA-   │ │   GSM    │ │   sGHO   │
+              │ Token      │ │  Routes  │ │  Vault   │
+              │ wrappers   │ │          │ │ (ERC4626)│
+              ├────────────┤ ├──────────┤ └──────────┘
+              │ • staUSDC  │ │ • USDC   │
+              │ • staUSDT  │ │ • USDT   │
+              └─────┬──────┘ └────┬─────┘
+                    │             │
+                    ▼             ▼
+              ┌────────────────────────────────────┐
+              │          ERC20 Tokens               │
+              │    GHO  ·  USDC  ·  USDT           │
+              └────────────────────────────────────┘
+```
+
+### Swap flow paths
+
+```
+swapToGHO (underlying → GHO)
+──────────────────────────────────────────────────────────
+  USDC/USDT ──► staticAToken.deposit() ──► GSM.sellAsset() ──► GHO
+                      (wrap)                  (sell stata)
+
+swapFromGHO (GHO → underlying)
+──────────────────────────────────────────────────────────
+  GHO ──► GSM.buyAsset() ──► staticAToken.redeem() ──► USDC/USDT
+            (buy stata)            (unwrap)
+
+swapTosGHO (underlying or GHO → sGHO)
+──────────────────────────────────────────────────────────
+  Direct:  GHO ─────────────────────────────► sGHO.deposit()
+  Routed:  USDC/USDT ──► stata ──► GSM ──► GHO ──► sGHO.deposit()
+
+swapFromsGHO (sGHO → underlying or GHO)
+──────────────────────────────────────────────────────────
+  Direct:  sGHO.redeem() ──► GHO
+  Routed:  sGHO.redeem() ──► GHO ──► GSM ──► stata ──► USDC/USDT
+```
+
+### Summary
+
+- `swapToGHO`: underlying token -> staticAToken deposit -> GSM sell -> GHO transfer
+- `swapFromGHO`: GHO -> GSM buy -> staticAToken redeem -> underlying transfer
+- `swapTosGHO`:
+  - direct path: GHO -> sGHO deposit
+  - routed path: underlying -> staticAToken -> GSM -> GHO -> sGHO
+- `swapFromsGHO`:
+  - direct path: sGHO redeem -> GHO transfer
+  - routed path: sGHO redeem -> GHO -> GSM buy -> staticAToken redeem -> underlying transfer
+
+Any incident or semantic change in these dependencies can change outcomes.
+
+## Integrator guidance
+
+1. Quote immediately before execution and include conservative slippage buffers.
+2. Track `DustReturned` events and reconcile consumed versus requested amounts.
+3. Surface custom errors (`InvalidGsm`, `InvalidToken`, `InvalidAmount`, `SlippageExceeded`, `ZeroAddress`).
+4. Monitor downstream governance/upgrade/pause events and disable routes on anomaly.
+5. Treat fork/invariant tests as smoke-test coverage, not complete economic assurance.
 
 ## Deployment-time validation and immutable routing
 
@@ -39,7 +132,7 @@ At deployment, the router validates:
   - `IStaticAToken(asset).asset()` returns a non-zero underlying token
 - The two discovered underlying tokens are distinct
 
-After these checks, routes are cached in immutables. The router does not re-discover
+After these checks, routes are cached as immutable state. The router does not re-discover
 or re-validate route wiring on each swap call.
 
 ## Security properties in the current implementation
@@ -68,7 +161,7 @@ These controls reduce common integration risk but do not remove dependency risk.
 ### 1) Downstream dependency outage or pause
 
 What can happen:
-- Swaps revert if GSM/staticAToken/sGHO/token contracts are paused, insolvent, or revert.
+- Swaps revert if GSM/staticAToken/sGHO/token contracts are paused, insolvent, or reverting.
 
 Why:
 - Router delegates execution to downstream protocols.
@@ -98,10 +191,10 @@ Current mitigation:
 ### 3) GSM capacity and partial consumption
 
 What can happen:
-- GSM may consume less than provided amount or fail due to insufficient capacity.
+- GSM may consume less than the provided amount or fail due to insufficient capacity.
 
 Why:
-- Capacity and matching logic are external to router logic.
+- Capacity and matching logic are external to the router.
 
 Impact:
 - Lower output, dust returns, or revert.
@@ -120,7 +213,7 @@ Why:
 - Fees, liquidity state, and exchange rates can move between preview and execution.
 
 Impact:
-- Output mismatch or `SlippageExceeded` on tight minima.
+- Output mismatch, or `SlippageExceeded` revert when minimum thresholds are set too tightly.
 
 Current mitigation:
 - Slippage enforcement at execution.
@@ -142,7 +235,7 @@ Impact:
 
 Current mitigation:
 - `minOut` slippage gate.
-- GHO residual return if vault consumes less than expected.
+- Residual GHO is returned if the vault consumes less than expected.
 - Integrators should treat `previewSwapFromsGHO` as indicative and set conservative `minOut`.
 
 ### 6) Non-standard token behavior
@@ -173,36 +266,3 @@ Impact:
 
 Current mitigation:
 - Use trusted ownership (preferably multisig/governance) and monitor rescue actions.
-
-## Security assumptions
-
-The current design assumes:
-
-1. GSM, staticAToken, sGHO, and token dependencies are non-malicious and interface-compatible.
-2. Supported routes maintain sufficient liquidity/capacity for intended trade sizes.
-3. Integrators/users set realistic slippage bounds for write calls.
-4. Downstream upgrades, pauses, and parameter changes are actively monitored.
-5. Router ownership is trusted to use `rescueToken` only for operational recovery.
-6. Preview functions are treated as estimates, not execution guarantees.
-7. `sGHO` `previewRedeem` and `redeem` semantics remain ERC4626-compatible over time.
-
-## Explicit dependency map
-
-- `swapToGHO`: underlying token -> staticAToken deposit -> GSM sell -> GHO transfer
-- `swapFromGHO`: GHO -> GSM buy -> staticAToken redeem -> underlying transfer
-- `swapTosGHO`:
-  - direct path: GHO -> sGHO deposit
-  - routed path: underlying -> staticAToken -> GSM -> GHO -> sGHO
-- `swapFromsGHO`:
-  - direct path: sGHO redeem -> GHO transfer
-  - routed path: sGHO redeem -> GHO -> GSM buy -> staticAToken redeem -> underlying transfer
-
-Any incident or semantic change in these dependencies can change outcomes.
-
-## Integrator guidance
-
-1. Quote close to execution and include conservative slippage buffers.
-2. Track `DustReturned` events and reconcile consumed vs requested amounts.
-3. Surface custom errors (`InvalidGsm`, `InvalidToken`, `InvalidAmount`, `SlippageExceeded`, `ZeroAddress`).
-4. Monitor downstream governance/upgrade/pause events and disable routes on anomaly.
-5. Treat fork/invariant tests as smoke coverage, not complete economic assurance.
