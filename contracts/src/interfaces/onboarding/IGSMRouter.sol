@@ -58,6 +58,24 @@ interface IGSMRouter {
     );
 
     /**
+     * @notice Emitted when a swap out of sGHO is completed
+     * @param user The address of the user who initiated the swap
+     * @param sgho The address of the sGHO vault redeemed
+     * @param outputToken The address of the token received (USDC/USDT/GHO)
+     * @param sghoAmount The amount of sGHO shares redeemed
+     * @param ghoAmount The amount of GHO redeemed from sGHO
+     * @param outputAmount The amount of output tokens received
+     */
+    event SwapFromsGHO(
+        address indexed user,
+        address indexed sgho,
+        address indexed outputToken,
+        uint256 sghoAmount,
+        uint256 ghoAmount,
+        uint256 outputAmount
+    );
+
+    /**
      * @notice Emitted when dust is returned to user due to partial GSM consumption
      * @param user The address of the user receiving the dust
      * @param token The address of the token returned
@@ -94,12 +112,32 @@ interface IGSMRouter {
     function swapTosGHO(address token, uint256 amount, uint256 minOut) external returns (uint256);
 
     /**
+     * @notice Swap sGHO shares into USDC/USDT/GHO
+     * @dev For USDC/USDT output, the function routes through the configured immutable GSM
+     * @param token Output token address (USDC/USDT/GHO)
+     * @param amount Amount of sGHO shares to redeem and swap
+     * @param minOut Minimum amount of output token to receive (slippage protection)
+     * @return Amount of output tokens received
+     */
+    function swapFromsGHO(address token, uint256 amount, uint256 minOut) external returns (uint256);
+
+    /**
      * @notice Rescue ERC20 token from the contract
      * @param token Address of the token to rescue
      * @param to Address to send the tokens to
      * @param amount Amount of tokens to rescue
      */
     function rescueToken(address token, address to, uint256 amount) external;
+
+    /**
+     * @notice Preview the amount of sGHO shares received for a given input amount
+     * @dev This is an estimation and actual results may vary due to GSM execution and vault share price
+     * @param token Input token address (USDC/USDT/GHO)
+     * @param amount Amount of input token to sell
+     * @return sghoAmount Expected amount of sGHO shares to receive
+     * @return fee Fee amount charged by the GSM (0 for direct GHO->sGHO input)
+     */
+    function previewSwapTosGHO(address token, uint256 amount) external view returns (uint256, uint256);
 
     /**
      * @notice Preview the amount of GHO received for a given input amount
@@ -109,7 +147,7 @@ interface IGSMRouter {
      * @return ghoAmount Expected amount of GHO to receive
      * @return fee Fee amount charged by the GSM
      */
-    function previewSwapToGHO(address token, uint256 amount) external view returns (uint256 ghoAmount, uint256 fee);
+    function previewSwapToGHO(address token, uint256 amount) external view returns (uint256, uint256);
 
     /**
      * @notice Preview the amount of output token received for a given GHO amount
@@ -119,10 +157,17 @@ interface IGSMRouter {
      * @return assetAmount Expected amount of output token to receive
      * @return fee Fee amount charged by the GSM
      */
-    function previewSwapFromGHO(address token, uint256 ghoAmount)
-        external
-        view
-        returns (uint256 assetAmount, uint256 fee);
+    function previewSwapFromGHO(address token, uint256 ghoAmount) external view returns (uint256, uint256);
+
+    /**
+     * @notice Preview the amount of output token received for a given sGHO share amount
+     * @dev This is an estimation and actual results may vary due to vault exchange rate and GSM execution
+     * @param token Output token address (USDC/USDT/GHO)
+     * @param amount Amount of sGHO shares to redeem and swap
+     * @return outputAmount Expected amount of output token to receive
+     * @return fee Fee amount charged by the GSM (0 for direct sGHO->GHO output)
+     */
+    function previewSwapFromsGHO(address token, uint256 amount) external view returns (uint256, uint256);
 
     /**
      * @notice Returns address of the GHO token on the deployed network

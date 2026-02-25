@@ -43,4 +43,12 @@ contract MockSGHOWithRate is ERC20 {
         assets = (shares * exchangeRate) / RATE_PRECISION;
         GHO.safeTransfer(receiver, assets);
     }
+
+    function previewDeposit(uint256 assets) external view returns (uint256 shares) {
+        return (assets * RATE_PRECISION) / exchangeRate;
+    }
+
+    function previewRedeem(uint256 shares) external view returns (uint256 assets) {
+        return (shares * exchangeRate) / RATE_PRECISION;
+    }
 }

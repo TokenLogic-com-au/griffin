@@ -9,7 +9,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {GSMRouter} from "src/contracts/onboarding/GSMRouter.sol";
 import {IGSMRouter} from "src/interfaces/onboarding/IGSMRouter.sol";
 import {IGSM} from "src/interfaces/IGSM.sol";
-import {MockSGHO} from "test/mocks/MockSGHO.sol";
+import {sGHO} from "test/mocks/sGho.sol";
 
 /**
  * @title GSMRouterTest
@@ -18,7 +18,7 @@ import {MockSGHO} from "test/mocks/MockSGHO.sol";
  */
 contract GSMRouterTest is Test {
     GSMRouter public router;
-    MockSGHO public sgho;
+    sGHO public sgho;
 
     // https://etherscan.io/address/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
     address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
@@ -40,12 +40,12 @@ contract GSMRouterTest is Test {
     address constant GSM_USDT = 0x535b2f7C20B9C83d70e519cf9991578eF9816B7B;
 
     // Test user address
-    address constant USER = address(0xBEEF);
+    address constant USER = address(0xC0FFEE);
 
     function setUp() public {
         vm.createSelectFork(vm.rpcUrl("mainnet"));
 
-        sgho = new MockSGHO(GHO);
+        sgho = new sGHO(GHO, type(uint160).max, address(this));
         router = new GSMRouter(address(this), GHO, address(sgho), GSM_USDC, GSM_USDT);
     }
 
@@ -267,7 +267,82 @@ contract SwapTosGHOTest is GSMRouterTest {
         uint256 shares = router.swapTosGHO(GHO, ghoAmount, ghoAmount);
         vm.stopPrank();
 
-        assertEq(shares, ghoAmount, "Mock sGHO should mint 1:1 shares");
+        assertEq(shares, ghoAmount, "sGHO copy should mint 1:1 shares at initial index");
         assertEq(IERC20(address(sgho)).balanceOf(USER), ghoAmount, "User should receive all shares");
+    }
+
+    function test_preview_swap_to_sg_ho() public view {
+        uint256 usdcAmount = 1000 * 1e6;
+
+        (uint256 sghoAmount, uint256 fee) = router.previewSwapTosGHO(USDC, usdcAmount);
+
+        assertGt(sghoAmount, 0, "Should preview sGHO amount");
+        assertGe(fee, 0, "Fee check should not revert");
+    }
+}
+
+contract SwapFromsGHOTest is GSMRouterTest {
+    function _mintSgho(uint256 ghoAmount) internal {
+        deal(GHO, USER, ghoAmount);
+        vm.startPrank(USER);
+        IERC20(GHO).approve(address(sgho), ghoAmount);
+        sgho.deposit(ghoAmount, USER);
+        vm.stopPrank();
+    }
+
+    function test_swap_sg_ho_to_gho() public {
+        uint256 ghoAmount = 100 ether;
+        _mintSgho(ghoAmount);
+
+        vm.startPrank(USER);
+        IERC20(address(sgho)).approve(address(router), ghoAmount);
+        vm.expectEmit(true, true, true, true);
+        emit IGSMRouter.SwapFromsGHO(USER, address(sgho), GHO, ghoAmount, ghoAmount, ghoAmount);
+        uint256 outputAmount = router.swapFromsGHO(GHO, ghoAmount, ghoAmount);
+        vm.stopPrank();
+
+        assertEq(outputAmount, ghoAmount, "Should redeem to full GHO amount");
+        assertEq(IERC20(GHO).balanceOf(USER), ghoAmount, "User should receive redeemed GHO");
+        assertEq(IERC20(address(sgho)).balanceOf(USER), 0, "User should spend all sGHO");
+    }
+
+    function test_swap_sg_ho_to_usdc() public {
+        uint256 ghoAmount = 100 ether;
+        _mintSgho(ghoAmount);
+
+        vm.startPrank(USER);
+        IERC20(address(sgho)).approve(address(router), ghoAmount);
+        vm.expectEmit(true, true, true, false);
+        emit IGSMRouter.SwapFromsGHO(USER, address(sgho), USDC, 0, 0, 0);
+        uint256 outputAmount = router.swapFromsGHO(USDC, ghoAmount, 1);
+        vm.stopPrank();
+
+        assertGt(outputAmount, 0, "Should receive USDC");
+        assertEq(IERC20(address(sgho)).balanceOf(USER), 0, "User should spend all sGHO");
+    }
+
+    function test_reverts_swap_from_sg_ho_zero_amount() public {
+        vm.startPrank(USER);
+        vm.expectRevert(IGSMRouter.InvalidAmount.selector);
+        router.swapFromsGHO(USDC, 0, 0);
+        vm.stopPrank();
+    }
+
+    function test_preview_swap_from_sg_ho_to_gho() public view {
+        uint256 shareAmount = 100 ether;
+
+        (uint256 outputAmount, uint256 fee) = router.previewSwapFromsGHO(GHO, shareAmount);
+
+        assertEq(outputAmount, shareAmount, "sGHO copy preview should be 1:1 at initial index");
+        assertEq(fee, 0, "Direct sGHO->GHO preview should have zero fee");
+    }
+
+    function test_preview_swap_from_sg_ho_to_usdc() public view {
+        uint256 shareAmount = 100 ether;
+
+        (uint256 outputAmount, uint256 fee) = router.previewSwapFromsGHO(USDC, shareAmount);
+
+        assertGt(outputAmount, 0, "Should preview USDC output");
+        assertGe(fee, 0, "Fee check should not revert");
     }
 }

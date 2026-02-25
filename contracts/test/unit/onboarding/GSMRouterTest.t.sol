@@ -67,6 +67,15 @@ contract GSMRouterTest is Test {
         router = new GSMRouter(address(this), GHO, sGHO, GSM_USDC, GSM_USDT);
     }
 
+    function _mintAndApprove(address token, uint256 amount) internal {
+        _mintAndApprove(token, address(router), amount);
+    }
+
+    function _mintAndApprove(address token, address spender, uint256 amount) internal {
+        MockERC20(token).mint(address(this), amount);
+        IERC20(token).approve(spender, amount);
+    }
+
     function test_constructor() public view {
         assertTrue(address(router) != address(0), "Router should be deployed");
         assertEq(router.owner(), address(this), "Owner should be this contract");
@@ -107,8 +116,7 @@ contract SwapToGHOTest is GSMRouterTest {
         uint256 expectedGhoAmount = USDC_AMOUNT; // MockGSM returns 1:1
 
         // Setup: Mint USDC to this contract (acting as user)
-        MockERC20(USDC).mint(address(this), USDC_AMOUNT);
-        MockERC20(USDC).approve(address(router), USDC_AMOUNT);
+        _mintAndApprove(USDC, USDC_AMOUNT);
 
         vm.expectEmit(true, true, false, true);
         emit SwapToGHO(address(this), USDC, USDC_AMOUNT, expectedGhoAmount);
@@ -144,8 +152,7 @@ contract SwapToGHOTest is GSMRouterTest {
         // Bound to reasonable range: 1 wei to 1M tokens (6 decimals)
         amount = bound(amount, 1, 1_000_000 * 1e6);
 
-        MockERC20(USDC).mint(address(this), amount);
-        MockERC20(USDC).approve(address(router), amount);
+        _mintAndApprove(USDC, amount);
 
         uint256 ghoBalanceBefore = MockERC20(GHO).balanceOf(address(this));
         uint256 usdcBalanceBefore = MockERC20(USDC).balanceOf(address(this));
@@ -166,8 +173,7 @@ contract SwapToGHOTest is GSMRouterTest {
         // minGhoAmount should be <= amount for swap to succeed (MockGSM is 1:1)
         minGhoAmount = bound(minGhoAmount, 0, amount);
 
-        MockERC20(USDC).mint(address(this), amount);
-        MockERC20(USDC).approve(address(router), amount);
+        _mintAndApprove(USDC, amount);
 
         vm.expectEmit(true, true, false, true);
         emit SwapToGHO(address(this), USDC, amount, amount);
@@ -185,8 +191,7 @@ contract SwapFromGHOTest is GSMRouterTest {
         uint256 expectedUsdcAmount = GHO_AMOUNT; // MockGSM returns 1:1
 
         // Setup: Mint GHO to this contract (acting as user)
-        MockERC20(GHO).mint(address(this), GHO_AMOUNT);
-        MockERC20(GHO).approve(address(router), GHO_AMOUNT);
+        _mintAndApprove(GHO, GHO_AMOUNT);
 
         vm.expectEmit(true, true, false, true);
         emit SwapFromGHO(address(this), USDC, GHO_AMOUNT, expectedUsdcAmount);
@@ -222,8 +227,7 @@ contract SwapFromGHOTest is GSMRouterTest {
         // Bound to reasonable range: 1 wei to 1M GHO (18 decimals)
         ghoAmount = bound(ghoAmount, 1, 1_000_000 * 1e18);
 
-        MockERC20(GHO).mint(address(this), ghoAmount);
-        MockERC20(GHO).approve(address(router), ghoAmount);
+        _mintAndApprove(GHO, ghoAmount);
 
         uint256 usdcBalanceBefore = MockERC20(USDC).balanceOf(address(this));
         uint256 ghoBalanceBefore = MockERC20(GHO).balanceOf(address(this));
@@ -246,8 +250,7 @@ contract SwapFromGHOTest is GSMRouterTest {
         // minOutputAmount should be <= ghoAmount for swap to succeed (MockGSM is 1:1)
         minOutputAmount = bound(minOutputAmount, 0, ghoAmount);
 
-        MockERC20(GHO).mint(address(this), ghoAmount);
-        MockERC20(GHO).approve(address(router), ghoAmount);
+        _mintAndApprove(GHO, ghoAmount);
 
         vm.expectEmit(true, true, false, true);
         emit SwapFromGHO(address(this), USDC, ghoAmount, ghoAmount);
@@ -264,8 +267,7 @@ contract SwapFromGHOTest is GSMRouterTest {
         uint256 strandedStata = 500 * 1e6;
         MockStaticAToken(STATA_USDC).mint(address(maliciousRouter), strandedStata);
 
-        MockERC20(GHO).mint(address(this), GHO_AMOUNT);
-        MockERC20(GHO).approve(address(maliciousRouter), GHO_AMOUNT);
+        _mintAndApprove(GHO, address(maliciousRouter), GHO_AMOUNT);
 
         uint256 usdcBefore = MockERC20(USDC).balanceOf(address(this));
         uint256 ghoBefore = MockERC20(GHO).balanceOf(address(this));
@@ -364,6 +366,104 @@ contract PreviewSwapFromGHOTest is GSMRouterTest {
         // MockGSM returns 1:1 with 0 fee
         assertEq(outputAmount, ghoAmount, "Preview should return 1:1 amount");
         assertEq(fee, 0, "Fee should be 0 in mock");
+    }
+}
+
+contract PreviewSwapTosGHOTest is GSMRouterTest {
+    function test_preview_swap_tos_gho_from_gho_success() public view {
+        (uint256 outputAmount, uint256 fee) = router.previewSwapTosGHO(GHO, GHO_AMOUNT);
+
+        assertEq(outputAmount, GHO_AMOUNT, "Should preview correct sGHO amount");
+        assertEq(fee, 0, "Direct GHO->sGHO path should have zero GSM fee");
+    }
+
+    function test_preview_swap_tos_gho_from_usdc_success() public view {
+        (uint256 outputAmount, uint256 fee) = router.previewSwapTosGHO(USDC, USDC_AMOUNT);
+
+        assertEq(outputAmount, USDC_AMOUNT, "Should preview correct sGHO amount");
+        assertEq(fee, 0, "Should have 0 fee in mock");
+    }
+
+    function test_reverts_preview_swap_tos_gho_unsupported_token() public {
+        address unsupportedToken = makeAddr("new-token");
+
+        vm.expectRevert(IGSMRouter.InvalidToken.selector);
+        router.previewSwapTosGHO(unsupportedToken, GHO_AMOUNT);
+    }
+
+    function test_reverts_preview_swap_tos_gho_zero_amount() public {
+        vm.expectRevert(IGSMRouter.InvalidAmount.selector);
+        router.previewSwapTosGHO(GHO, 0);
+    }
+
+    function test_fuzz_preview_swap_tos_gho(uint256 amount, uint8 tokenChoice) public view {
+        amount = bound(amount, 1, 1_000_000 * 1e18);
+
+        address token;
+        if (tokenChoice % 3 == 0) {
+            token = USDC;
+        } else if (tokenChoice % 3 == 1) {
+            token = USDT;
+        } else {
+            token = GHO;
+        }
+
+        (uint256 outputAmount, uint256 fee) = router.previewSwapTosGHO(token, amount);
+        assertEq(outputAmount, amount, "Preview should return 1:1 amount in mock setup");
+        if (token == GHO) {
+            assertEq(fee, 0, "Direct GHO->sGHO path should have zero fee");
+        } else {
+            assertEq(fee, 0, "GSM fee should be 0 in mock");
+        }
+    }
+}
+
+contract PreviewSwapFromsGHOTest is GSMRouterTest {
+    function test_preview_swap_from_sgho_to_gho_success() public view {
+        (uint256 outputAmount, uint256 fee) = router.previewSwapFromsGHO(GHO, GHO_AMOUNT);
+
+        assertEq(outputAmount, GHO_AMOUNT, "Should preview correct GHO output amount");
+        assertEq(fee, 0, "Direct sGHO->GHO path should have zero GSM fee");
+    }
+
+    function test_preview_swap_from_sgho_to_usdc_success() public view {
+        (uint256 outputAmount, uint256 fee) = router.previewSwapFromsGHO(USDC, GHO_AMOUNT);
+
+        assertEq(outputAmount, GHO_AMOUNT, "Should preview correct USDC amount");
+        assertEq(fee, 0, "Should have 0 fee in mock");
+    }
+
+    function test_reverts_preview_swap_from_sgho_unsupported_token() public {
+        address unsupportedToken = makeAddr("new-token");
+
+        vm.expectRevert(IGSMRouter.InvalidToken.selector);
+        router.previewSwapFromsGHO(unsupportedToken, GHO_AMOUNT);
+    }
+
+    function test_reverts_preview_swap_from_sgho_zero_amount() public {
+        vm.expectRevert(IGSMRouter.InvalidAmount.selector);
+        router.previewSwapFromsGHO(USDC, 0);
+    }
+
+    function test_fuzz_preview_swap_from_sgho(uint256 amount, uint8 tokenChoice) public view {
+        amount = bound(amount, 1, 1_000_000 * 1e18);
+
+        address token;
+        if (tokenChoice % 3 == 0) {
+            token = USDC;
+        } else if (tokenChoice % 3 == 1) {
+            token = USDT;
+        } else {
+            token = GHO;
+        }
+
+        (uint256 outputAmount, uint256 fee) = router.previewSwapFromsGHO(token, amount);
+        assertEq(outputAmount, amount, "Preview should return 1:1 amount in mock setup");
+        if (token == GHO) {
+            assertEq(fee, 0, "Direct sGHO->GHO path should have zero fee");
+        } else {
+            assertEq(fee, 0, "GSM fee should be 0 in mock");
+        }
     }
 }
 
