@@ -21,6 +21,12 @@ const ERROR_MESSAGES: Record<string, string> = {
   // GSMRouter errors
   InvalidGsm:
     "The GHO Stability Module is not available for this token. Please try again later.",
+  OwnableInvalidOwner:
+    "The provided owner address is invalid.",
+  OwnableUnauthorizedAccount:
+    "Your wallet is not authorized for this action.",
+  SafeERC20FailedOperation:
+    "Token transfer or approval failed at the contract level.",
 };
 
 /** User-rejected transaction signatures */

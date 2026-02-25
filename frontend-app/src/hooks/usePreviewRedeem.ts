@@ -10,9 +10,8 @@ import type { RedeemPreview } from "@/types";
 
 /**
  * Preview the redeem flow:
- *   - sGHO.previewRedeem(shares) -> ghoAmount
- *   - For GHO output: ghoAmount is the output
- *   - For USDC/USDT: GSMRouter.previewSwapFromGHO(ghoAmount) -> output token amount
+ *   - sGHO.previewRedeem(shares) -> ghoAmount (display)
+ *   - GSMRouter.previewSwapFromsGHO(token, shares) -> output token amount + fee
  */
 export function usePreviewRedeem(
   shares: bigint | undefined,
@@ -34,25 +33,23 @@ export function usePreviewRedeem(
 
   const ghoAmount = (redeemPreview.data as bigint) ?? undefined;
 
-  // Step 2: For non-GHO output, preview the GSM swap
-  const gsmPreview = useReadContract({
+  // Step 2: Preview router output for target token directly from shares
+  const swapPreview = useReadContract({
     address: addresses.gsmRouter,
     abi: gsmRouterAbi,
-    functionName: "previewSwapFromGHO",
-    args: outputTokenAddress && ghoAmount ? [outputTokenAddress, ghoAmount] : undefined,
+    functionName: "previewSwapFromsGHO",
+    args: shares && outputTokenAddress ? [outputTokenAddress, shares] : undefined,
     query: {
-      enabled: !isGHO && !!outputTokenAddress && !!ghoAmount && ghoAmount > 0n,
+      enabled,
     },
   });
 
-  const estimatedOutput: bigint | undefined = isGHO
-    ? ghoAmount
-    : gsmPreview.data
-      ? (gsmPreview.data as [bigint, bigint])[0]
-      : undefined;
+  const estimatedOutput: bigint | undefined = swapPreview.data
+    ? (swapPreview.data as [bigint, bigint])[0]
+    : undefined;
 
-  const fee: bigint = !isGHO && gsmPreview.data
-    ? (gsmPreview.data as [bigint, bigint])[1]
+  const fee: bigint = swapPreview.data
+    ? (swapPreview.data as [bigint, bigint])[1]
     : 0n;
 
   // Compute quote slippage vs 1:1 baseline.
@@ -64,8 +61,12 @@ export function usePreviewRedeem(
     priceImpactBps = calculateSlippageBps(ghoAmount, normalized);
   }
 
-  const isLoading = redeemPreview.isLoading || gsmPreview.isLoading;
-  const isError = redeemPreview.isError || gsmPreview.isError;
+  if (isGHO) {
+    priceImpactBps = 0;
+  }
+
+  const isLoading = redeemPreview.isLoading || swapPreview.isLoading;
+  const isError = redeemPreview.isError || swapPreview.isError;
 
   const preview: RedeemPreview | undefined =
     ghoAmount !== undefined && estimatedOutput !== undefined

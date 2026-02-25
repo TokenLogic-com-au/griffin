@@ -12,6 +12,7 @@ import { ErrorDisplay } from "./ErrorDisplay";
 import { useTokenBalances } from "@/hooks/useTokenBalances";
 import { useAllowance } from "@/hooks/useAllowance";
 import { usePreviewDeposit } from "@/hooks/usePreviewDeposit";
+import { useFacilitatorHeadroom } from "@/hooks/useFacilitatorHeadroom";
 import { useApprove } from "@/hooks/useApprove";
 import { useDeposit } from "@/hooks/useDeposit";
 
@@ -24,6 +25,7 @@ import type { SupportedToken, TransactionStep } from "@/types";
 export function DepositForm() {
   const [selectedToken, setSelectedToken] = useState<SupportedToken>("GHO");
   const [amountStr, setAmountStr] = useState("");
+  const [headroomSubmitError, setHeadroomSubmitError] = useState<string | undefined>();
 
   const token = getTokenBySymbol(selectedToken);
   const { balances, refetch: refetchBalances } = useTokenBalances();
@@ -49,6 +51,12 @@ export function DepositForm() {
   const needsApproval = parsedAmount !== undefined && allowance < parsedAmount;
 
   const { preview, isLoading: previewLoading } = usePreviewDeposit(token.address, parsedAmount);
+  const { headroom: facilitatorHeadroom } = useFacilitatorHeadroom(token.address);
+  const requiredFacilitatorHeadroom = useMemo(() => {
+    if (selectedToken === "GHO" || !preview) return undefined;
+    // GSM facilitator bucket tracks gross GHO minted, i.e. net output + fee.
+    return preview.ghoAmount + preview.fee;
+  }, [selectedToken, preview]);
 
   const {
     approve, txHash: approveTxHash, status: approveStatus,
@@ -77,6 +85,10 @@ export function DepositForm() {
     }
   }, [depositStatus, refetchBalances, refetchAllowance, depositTxHash, selectedToken, depositEvent]);
 
+  useEffect(() => {
+    setHeadroomSubmitError(undefined);
+  }, [selectedToken, amountStr]);
+
   const steps: TransactionStep[] = useMemo(() => {
     const result: TransactionStep[] = [];
     if (needsApproval || approveStatus !== "idle") {
@@ -99,7 +111,23 @@ export function DepositForm() {
   const previewReady = !!preview;
 
   const handleSubmit = useCallback(() => {
+    setHeadroomSubmitError(undefined);
     if (!parsedAmount || !validation.valid || !preview) return;
+
+    if (
+      selectedToken !== "GHO" &&
+      requiredFacilitatorHeadroom !== undefined &&
+      facilitatorHeadroom !== undefined &&
+      facilitatorHeadroom < requiredFacilitatorHeadroom
+    ) {
+      const available = formatTokenAmount(facilitatorHeadroom, 18, 6);
+      const required = formatTokenAmount(requiredFacilitatorHeadroom, 18, 6);
+      setHeadroomSubmitError(
+        `Not enough ${selectedToken} facilitator headroom. Available: ${available} GHO, required: ${required} GHO for this deposit.`
+      );
+      return;
+    }
+
     if (needsApproval && approveStatus === "idle") {
       approve(token.address, parsedAmount, selectedToken);
     } else {
@@ -115,9 +143,13 @@ export function DepositForm() {
     approve,
     token.address,
     deposit,
+    requiredFacilitatorHeadroom,
+    facilitatorHeadroom,
+    setHeadroomSubmitError,
   ]);
 
   const handleReset = () => { resetApprove(); resetDeposit(); setAmountStr(""); };
+  const clearHeadroomSubmitError = useCallback(() => setHeadroomSubmitError(undefined), []);
 
   let buttonLabel = "Enter an amount";
   let buttonDisabled = true;
@@ -132,6 +164,13 @@ export function DepositForm() {
 
   const showStepper = approveStatus !== "idle" || depositStatus !== "idle";
   const showActionButton = !showStepper || awaitingDepositAction;
+  const precheckError = headroomSubmitError
+    ? {
+        name: "FACILITATOR_BUCKET_CAPACITY_EXCEEDED",
+        message: headroomSubmitError,
+        isUserRejection: false,
+      }
+    : undefined;
 
   return (
     <div className="space-y-5">
@@ -171,8 +210,14 @@ export function DepositForm() {
       )}
 
       {/* Errors */}
-      {!showStepper && (approveError || depositError) && (
-        <ErrorDisplay error={approveError ?? depositError} onDismiss={() => { resetApprove(); resetDeposit(); }} />
+      {precheckError && (
+        <ErrorDisplay error={precheckError} onDismiss={clearHeadroomSubmitError} />
+      )}
+      {!showStepper && !precheckError && (approveError || depositError) && (
+        <ErrorDisplay
+          error={approveError ?? depositError}
+          onDismiss={() => { resetApprove(); resetDeposit(); }}
+        />
       )}
 
       {/* Success */}

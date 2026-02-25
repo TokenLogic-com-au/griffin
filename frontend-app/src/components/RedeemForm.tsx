@@ -10,11 +10,10 @@ import { TransactionStatus } from "./TransactionStatus";
 import { ErrorDisplay } from "./ErrorDisplay";
 
 import { useTokenBalances } from "@/hooks/useTokenBalances";
-import { useAllowance } from "@/hooks/useAllowance";
+import { useSGHOAllowance } from "@/hooks/useAllowance";
 import { usePreviewRedeem } from "@/hooks/usePreviewRedeem";
 import { useApprove } from "@/hooks/useApprove";
 import { useRedeem } from "@/hooks/useRedeem";
-import { useRedeemShares } from "@/hooks/useRedeemShares";
 
 import { getTokenBySymbol } from "@/config/tokens";
 import { addresses } from "@/config/addresses";
@@ -26,13 +25,10 @@ import type { SupportedToken, TransactionStep } from "@/types";
 export function RedeemForm() {
   const [outputToken, setOutputToken] = useState<SupportedToken>("GHO");
   const [sharesStr, setSharesStr] = useState("");
-  const [preRedeemGhoBalance, setPreRedeemGhoBalance] = useState<bigint | undefined>();
-  const [redeemedGhoAmount, setRedeemedGhoAmount] = useState<bigint | undefined>();
 
   const token = getTokenBySymbol(outputToken);
   const { balances, refetch: refetchBalances } = useTokenBalances();
   const sGHOBalance = balances.sGHO ?? 0n;
-  const isGHOOutput = outputToken === "GHO";
 
   const sGHOTokenInfo = useMemo(
     () => ({ symbol: "sGHO" as SupportedToken, name: "sGHO Shares", address: addresses.sGHO, decimals: 18, icon: "" }),
@@ -41,7 +37,12 @@ export function RedeemForm() {
 
   const parsedShares = useMemo(() => {
     if (!sharesStr) return undefined;
-    try { const val = parseUnits(sharesStr, 18); return val > 0n ? val : undefined; } catch { return undefined; }
+    try {
+      const val = parseUnits(sharesStr, 18);
+      return val > 0n ? val : undefined;
+    } catch {
+      return undefined;
+    }
   }, [sharesStr]);
 
   const validation = useMemo(
@@ -50,14 +51,9 @@ export function RedeemForm() {
   );
 
   const { preview, isLoading: previewLoading } = usePreviewRedeem(parsedShares, token.address);
-  const ghoAmountForSwap = !isGHOOutput ? (redeemedGhoAmount ?? preview?.ghoAmount) : undefined;
 
-  const { allowance, refetch: refetchAllowance } = useAllowance(addresses.GHO);
-  const needsApproval = !isGHOOutput && ghoAmountForSwap !== undefined && allowance < ghoAmountForSwap;
-  const minSwapOutput = useMemo(() => {
-    if (!preview || !ghoAmountForSwap || preview.ghoAmount === 0n) return undefined;
-    return (preview.estimatedOutput * ghoAmountForSwap) / preview.ghoAmount;
-  }, [preview, ghoAmountForSwap]);
+  const { allowance, refetch: refetchAllowance } = useSGHOAllowance();
+  const needsApproval = parsedShares !== undefined && allowance < parsedShares;
 
   const {
     approve, txHash: approveTxHash, status: approveStatus,
@@ -65,169 +61,104 @@ export function RedeemForm() {
   } = useApprove();
 
   const {
-    redeem: swapFromGHO, txHash: swapTxHash, status: swapStatus,
-    error: swapError, redeemEvent, dustEvents, reset: resetSwap,
+    redeem, txHash: redeemTxHash, status: redeemStatus,
+    error: redeemError, redeemEvent, dustEvents, reset: resetRedeem,
   } = useRedeem();
-
-  const {
-    redeemShares, txHash: redeemSharesTxHash, status: redeemSharesStatus,
-    error: redeemSharesError, reset: resetRedeemShares,
-  } = useRedeemShares();
-
-  useEffect(() => {
-    if (redeemSharesStatus === "success") {
-      refetchBalances();
-    }
-  }, [redeemSharesStatus, refetchBalances]);
-
-  useEffect(() => {
-    if (redeemSharesStatus === "success" && preRedeemGhoBalance !== undefined) {
-      const delta = balances.GHO > preRedeemGhoBalance ? balances.GHO - preRedeemGhoBalance : 0n;
-      if (delta > 0n) setRedeemedGhoAmount(delta);
-    }
-  }, [redeemSharesStatus, preRedeemGhoBalance, balances.GHO]);
 
   useEffect(() => {
     if (approveStatus === "success") refetchAllowance();
   }, [approveStatus, refetchAllowance]);
 
   useEffect(() => {
-    if (swapStatus === "success") {
+    if (redeemStatus === "success") {
       refetchBalances();
       refetchAllowance();
-      if (swapTxHash) {
+      if (redeemTxHash) {
         trackEvent({
           type: "redeem_completed",
           token: outputToken,
           amountOut: redeemEvent?.outputAmount?.toString() ?? "0",
-          txHash: swapTxHash,
+          txHash: redeemTxHash,
         });
       }
     }
-  }, [swapStatus, refetchBalances, refetchAllowance, swapTxHash, outputToken, redeemEvent]);
+  }, [redeemStatus, refetchBalances, refetchAllowance, redeemTxHash, outputToken, redeemEvent]);
 
   const steps: TransactionStep[] = useMemo(() => {
     const result: TransactionStep[] = [];
-    if (redeemSharesStatus !== "idle") {
+
+    if (needsApproval || approveStatus !== "idle") {
       result.push({
-        label: isGHOOutput ? "Redeem to GHO" : "Redeem sGHO to GHO",
-        status: redeemSharesStatus,
-        txHash: redeemSharesTxHash,
-        error: redeemSharesError?.message,
+        label: "Approve sGHO",
+        status: approveStatus,
+        txHash: approveTxHash,
+        error: approveError?.message,
       });
     }
 
-    if (!isGHOOutput && redeemSharesStatus === "success") {
-      if (needsApproval || approveStatus !== "idle") {
-        result.push({
-          label: "Approve GHO",
-          status: approveStatus,
-          txHash: approveTxHash,
-          error: approveError?.message,
-        });
-      }
-
+    if (redeemStatus !== "idle" || approveStatus === "success" || !needsApproval) {
       result.push({
-        label: `Swap GHO to ${outputToken}`,
-        status: swapStatus,
-        txHash: swapTxHash,
-        error: swapError?.message,
+        label: `Redeem to ${outputToken}`,
+        status: redeemStatus,
+        txHash: redeemTxHash,
+        error: redeemError?.message,
       });
     }
 
     return result;
-  }, [
-    redeemSharesStatus,
-    redeemSharesTxHash,
-    redeemSharesError,
-    isGHOOutput,
-    needsApproval,
-    approveStatus,
-    approveTxHash,
-    approveError,
-    outputToken,
-    swapStatus,
-    swapTxHash,
-    swapError,
-  ]);
+  }, [needsApproval, approveStatus, approveTxHash, approveError, redeemStatus, redeemTxHash, redeemError, outputToken]);
 
   const isInProgress =
-    ["pending", "confirming"].includes(redeemSharesStatus) ||
     ["pending", "confirming"].includes(approveStatus) ||
-    ["pending", "confirming"].includes(swapStatus);
-  const awaitingApprovalAction =
-    !isGHOOutput && redeemSharesStatus === "success" && needsApproval && approveStatus === "idle";
-  const awaitingSwapAction =
-    !isGHOOutput &&
-    redeemSharesStatus === "success" &&
-    (!needsApproval || approveStatus === "success") &&
-    swapStatus === "idle";
+    ["pending", "confirming"].includes(redeemStatus);
+  const awaitingRedeemAction = approveStatus === "success" && redeemStatus === "idle";
 
   const handleSubmit = useCallback(() => {
     if (!parsedShares || !validation.valid || !preview) return;
 
-    if (redeemSharesStatus === "idle") {
-      setPreRedeemGhoBalance(balances.GHO);
-      setRedeemedGhoAmount(undefined);
-      redeemShares(parsedShares);
+    if (needsApproval && approveStatus === "idle") {
+      approve(addresses.sGHO, parsedShares);
       return;
     }
 
-    if (!isGHOOutput && ghoAmountForSwap && ghoAmountForSwap > 0n && minSwapOutput !== undefined) {
-      if (needsApproval && approveStatus === "idle") {
-        approve(addresses.GHO, ghoAmountForSwap, outputToken);
-      } else if ((!needsApproval || approveStatus === "success") && swapStatus === "idle") {
-        swapFromGHO(ghoAmountForSwap, token.address, minSwapOutput, outputToken);
-      }
+    if (redeemStatus === "idle") {
+      redeem(parsedShares, token.address, preview.estimatedOutput, outputToken);
     }
-  }, [
-    parsedShares,
-    validation.valid,
-    preview,
-    redeemSharesStatus,
-    balances.GHO,
-    isGHOOutput,
-    ghoAmountForSwap,
-    minSwapOutput,
-    needsApproval,
-    approveStatus,
-    approve,
-    outputToken,
-    swapStatus,
-    swapFromGHO,
-    token.address,
-    redeemShares,
-  ]);
+  }, [parsedShares, validation.valid, preview, needsApproval, approveStatus, approve, redeemStatus, redeem, token.address, outputToken]);
 
   const handleReset = () => {
     resetApprove();
-    resetSwap();
-    resetRedeemShares();
+    resetRedeem();
     setSharesStr("");
-    setPreRedeemGhoBalance(undefined);
-    setRedeemedGhoAmount(undefined);
   };
 
   let buttonLabel = "Enter shares amount";
   let buttonDisabled = true;
-  if (!sharesStr) { buttonLabel = "Enter shares amount"; }
-  else if (!validation.valid) { buttonLabel = validation.error ?? "Invalid input"; }
-  else if (previewLoading) { buttonLabel = "Fetching quote..."; }
-  else if (isInProgress) { buttonLabel = "Processing..."; }
-  else if (redeemSharesStatus === "idle") { buttonLabel = isGHOOutput ? "Redeem" : "Redeem to GHO"; buttonDisabled = false; }
-  else if (awaitingApprovalAction) { buttonLabel = "Approve GHO"; buttonDisabled = false; }
-  else if (awaitingSwapAction) { buttonLabel = `Swap to ${outputToken}`; buttonDisabled = false; }
+  if (!sharesStr) {
+    buttonLabel = "Enter shares amount";
+  } else if (!validation.valid) {
+    buttonLabel = validation.error ?? "Invalid input";
+  } else if (previewLoading) {
+    buttonLabel = "Fetching quote...";
+  } else if (isInProgress) {
+    buttonLabel = "Processing...";
+  } else if (awaitingRedeemAction) {
+    buttonLabel = "Redeem";
+    buttonDisabled = false;
+  } else if (needsApproval) {
+    buttonLabel = "Approve & Redeem";
+    buttonDisabled = false;
+  } else if (validation.valid) {
+    buttonLabel = "Redeem";
+    buttonDisabled = false;
+  }
 
-  const showStepper = redeemSharesStatus !== "idle" || approveStatus !== "idle" || swapStatus !== "idle";
-  const showActionButton = !showStepper || awaitingApprovalAction || awaitingSwapAction;
+  const showStepper = approveStatus !== "idle" || redeemStatus !== "idle";
+  const showActionButton = !showStepper || awaitingRedeemAction;
   const outputDecimals = outputToken === "GHO" ? 18 : 6;
-  const showSuccess =
-    (isGHOOutput && redeemSharesStatus === "success") ||
-    (!isGHOOutput && swapStatus === "success" && !!redeemEvent);
-  const successAmount = isGHOOutput
-    ? (redeemedGhoAmount ?? preview?.ghoAmount ?? 0n)
-    : (redeemEvent?.outputAmount ?? 0n);
-  const rootError = redeemSharesError ?? approveError ?? swapError;
+  const showSuccess = redeemStatus === "success" && !!redeemEvent;
+  const successAmount = redeemEvent?.outputAmount ?? 0n;
+  const rootError = approveError ?? redeemError;
 
   return (
     <div className="space-y-5">
@@ -250,10 +181,7 @@ export function RedeemForm() {
           onChange={(t) => {
             setOutputToken(t);
             resetApprove();
-            resetSwap();
-            resetRedeemShares();
-            setPreRedeemGhoBalance(undefined);
-            setRedeemedGhoAmount(undefined);
+            resetRedeem();
           }}
           disabled={isInProgress}
         />
@@ -273,8 +201,7 @@ export function RedeemForm() {
           error={rootError}
           onDismiss={() => {
             resetApprove();
-            resetSwap();
-            resetRedeemShares();
+            resetRedeem();
           }}
         />
       )}

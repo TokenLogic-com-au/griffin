@@ -16,7 +16,9 @@ import type { StepStatus, SupportedToken } from "@/types";
 
 interface RedeemEvent {
   user: Address;
+  sgho: Address;
   outputToken: Address;
+  sghoAmount: bigint;
   ghoAmount: bigint;
   outputAmount: bigint;
 }
@@ -28,8 +30,8 @@ interface DustEvent {
 }
 
 /**
- * Hook for executing GSMRouter.swapFromGHO().
- * Tracks full tx lifecycle and watches for SwapFromGHO + DustReturned events.
+ * Hook for executing GSMRouter.swapFromsGHO().
+ * Tracks full tx lifecycle and watches for SwapFromsGHO + DustReturned events.
  */
 export function useRedeem() {
   const [redeemEvent, setRedeemEvent] = useState<RedeemEvent | null>(null);
@@ -54,12 +56,12 @@ export function useRedeem() {
     chainId: targetChain.id,
   });
 
-  // Watch for SwapFromGHO event
+  // Watch for SwapFromsGHO event
   useWatchContractEvent({
     chainId: targetChain.id,
     address: addresses.gsmRouter,
     abi: gsmRouterAbi,
-    eventName: "SwapFromGHO",
+    eventName: "SwapFromsGHO",
     onLogs(logs) {
       for (const log of logs) {
         if (log.transactionHash === txHash) {
@@ -90,7 +92,7 @@ export function useRedeem() {
 
   const redeem = useCallback(
     (
-      ghoAmount: bigint,
+      shares: bigint,
       tokenAddress: Address,
       minOutputAmount: bigint,
       tokenSymbol: SupportedToken
@@ -98,14 +100,14 @@ export function useRedeem() {
       setRedeemEvent(null);
       setDustEvents([]);
 
-      trackEvent({ type: "redeem_started", token: tokenSymbol, shares: ghoAmount.toString() });
+      trackEvent({ type: "redeem_started", token: tokenSymbol, shares: shares.toString() });
 
       writeContract({
         chainId: targetChain.id,
         address: addresses.gsmRouter,
         abi: gsmRouterAbi,
-        functionName: "swapFromGHO",
-        args: [tokenAddress, ghoAmount, minOutputAmount],
+        functionName: "swapFromsGHO",
+        args: [tokenAddress, shares, minOutputAmount],
       });
     },
     [writeContract]

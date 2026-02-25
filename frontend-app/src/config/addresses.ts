@@ -1,7 +1,7 @@
 import type { Address } from "viem";
 
 const RAW_ENV = {
-  NEXT_PUBLIC_GSM_ROUTER_ADDRESS: process.env.NEXT_PUBLIC_GSM_ROUTER_ADDRESS,
+  NEXT_PUBLIC_SGHO_ROUTER_ADDRESS: process.env.NEXT_PUBLIC_SGHO_ROUTER_ADDRESS,
   NEXT_PUBLIC_SGHO_ADDRESS: process.env.NEXT_PUBLIC_SGHO_ADDRESS,
   NEXT_PUBLIC_GHO_ADDRESS: process.env.NEXT_PUBLIC_GHO_ADDRESS,
   NEXT_PUBLIC_USDC_ADDRESS: process.env.NEXT_PUBLIC_USDC_ADDRESS,
@@ -41,7 +41,7 @@ function envAddress(
 /** All contract addresses, env-overridable for dev/fork usage */
 export const addresses = {
   gsmRouter: envAddress(
-    "NEXT_PUBLIC_GSM_ROUTER_ADDRESS",
+    "NEXT_PUBLIC_SGHO_ROUTER_ADDRESS",
     "0x0000000000000000000000000000000000000000" as Address,
     true
   ),
