@@ -4,5 +4,14 @@
       "name": "v1.10.0",
       "rev": "8bbcf6e3f8f62f419e5429a0bd89331c85c37824"
     }
+  },
+  "lib/openzeppelin-contracts": {
+    "rev": "fcbae5394ae8ad52d8e580a3477db99814b9d565"
+  },
+  "lib/openzeppelin-contracts-upgradeable": {
+    "rev": "c9f48f0d6c470a3edab20dcbb3cc35dcfc7f4f1f"
+  },
+  "lib/solidity-utils": {
+    "rev": "47895e3b09d29abee1165a07db643362537911c6"
   }
 }
