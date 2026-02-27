@@ -2,16 +2,16 @@
 pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 import {IStaticAToken} from "src/interfaces/IStaticAToken.sol";
 import {IGSM} from "src/interfaces/IGSM.sol";
 import {IGhoRouter} from "src/interfaces/IGhoRouter.sol";
 
 /**
- * @title GSMRouter
+ * @title GhoRouter
  * @notice Router for token swaps through whitelisted GSMs and direct GHO/sGHO conversion paths
  * @dev This contract never stores user funds and uses exact approvals only
  */
@@ -50,16 +50,13 @@ contract GhoRouter is Ownable, IGhoRouter {
         public
         returns (uint256)
     {
-        require(amount > 0, InvalidAmount());
-        require(recipient != address(0), ZeroAddress());
+        _validateInputs(amount, recipient);
         _requireAllowedGsm(gsm);
 
-        address stataToken = _validateAndGetStataToken(gsm, token);
+        address stataToken = _getStataToken(gsm, token);
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
 
-        (uint256 inputAmountUsed, uint256 ghoAmount) = _sellTokenForGho(gsm, token, stataToken, amount);
-
-        require(ghoAmount >= minGHOAmount, SlippageExceeded());
+        (uint256 inputAmountUsed, uint256 ghoAmount) = _sellTokenForGho(gsm, token, stataToken, amount, minGHOAmount);
         IERC20(GHO).safeTransfer(recipient, ghoAmount);
         emit SwapToGHO(msg.sender, token, inputAmountUsed, ghoAmount);
 
@@ -76,17 +73,15 @@ contract GhoRouter is Ownable, IGhoRouter {
         public
         returns (uint256)
     {
-        require(ghoAmount > 0, InvalidAmount());
-        require(recipient != address(0), ZeroAddress());
+        _validateInputs(ghoAmount, recipient);
         _requireAllowedGsm(gsm);
 
         (address token, address stataToken) = _getTokensFromGsm(gsm);
         IERC20(GHO).safeTransferFrom(msg.sender, address(this), ghoAmount);
 
-        (uint256 outputAmount, uint256 ghoBurned) = _buyUnderlyingWithGho(gsm, stataToken, ghoAmount, recipient);
-
-        require(outputAmount >= minOutputAmount, SlippageExceeded());
-        emit SwapFromGHO(msg.sender, token, ghoBurned, outputAmount);
+        (uint256 outputAmount, uint256 ghoSold) =
+            _buyUnderlyingWithGho(gsm, stataToken, ghoAmount, recipient, minOutputAmount);
+        emit SwapFromGHO(msg.sender, token, ghoSold, outputAmount);
 
         return outputAmount;
     }
@@ -101,17 +96,14 @@ contract GhoRouter is Ownable, IGhoRouter {
         public
         returns (uint256)
     {
-        require(amount > 0, InvalidAmount());
-        require(recipient != address(0), ZeroAddress());
+        _validateInputs(amount, recipient);
         _requireAllowedGsm(gsm);
 
-        address stataToken = _validateAndGetStataToken(gsm, token);
+        address stataToken = _getStataToken(gsm, token);
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
 
-        (uint256 inputAmountUsed, uint256 ghoAmount) = _sellTokenForGho(gsm, token, stataToken, amount);
-        uint256 sghoAmount = _depositGhoToSgho(ghoAmount, recipient);
-
-        require(sghoAmount >= minSGHOAmount, SlippageExceeded());
+        (uint256 inputAmountUsed, uint256 ghoAmount) = _sellTokenForGho(gsm, token, stataToken, amount, 0);
+        uint256 sghoAmount = _depositToSgho(ghoAmount, recipient, minSGHOAmount);
         emit SwapTosGHO(msg.sender, token, sGHO, inputAmountUsed, ghoAmount, sghoAmount);
 
         return sghoAmount;
@@ -124,13 +116,10 @@ contract GhoRouter is Ownable, IGhoRouter {
 
     /// @inheritdoc IGhoRouter
     function swapTosGHO(uint256 ghoAmount, uint256 minSGHOAmount, address recipient) public returns (uint256) {
-        require(ghoAmount > 0, InvalidAmount());
-        require(recipient != address(0), ZeroAddress());
+        _validateInputs(ghoAmount, recipient);
 
         IERC20(GHO).safeTransferFrom(msg.sender, address(this), ghoAmount);
-        uint256 sghoAmount = _depositGhoToSgho(ghoAmount, recipient);
-
-        require(sghoAmount >= minSGHOAmount, SlippageExceeded());
+        uint256 sghoAmount = _depositToSgho(ghoAmount, recipient, minSGHOAmount);
         emit SwapTosGHO(msg.sender, GHO, sGHO, ghoAmount, ghoAmount, sghoAmount);
 
         return sghoAmount;
@@ -146,17 +135,15 @@ contract GhoRouter is Ownable, IGhoRouter {
         public
         returns (uint256)
     {
-        require(sghoAmount > 0, InvalidAmount());
-        require(recipient != address(0), ZeroAddress());
+        _validateInputs(sghoAmount, recipient);
         _requireAllowedGsm(gsm);
 
-        uint256 ghoAmount = _redeemSghoToGho(sghoAmount);
+        uint256 ghoAmount = _redeemGho(sghoAmount, 0);
         (address outputToken, address stataToken) = _getTokensFromGsm(gsm);
 
-        (uint256 outputAmount, uint256 ghoBurned) = _buyUnderlyingWithGho(gsm, stataToken, ghoAmount, recipient);
-
-        require(outputAmount >= minOutputAmount, SlippageExceeded());
-        emit SwapFromsGHO(msg.sender, sGHO, outputToken, sghoAmount, ghoBurned, outputAmount);
+        (uint256 outputAmount, uint256 ghoSold) =
+            _buyUnderlyingWithGho(gsm, stataToken, ghoAmount, recipient, minOutputAmount);
+        emit SwapFromsGHO(msg.sender, sGHO, outputToken, sghoAmount, ghoSold, outputAmount);
 
         return outputAmount;
     }
@@ -168,11 +155,8 @@ contract GhoRouter is Ownable, IGhoRouter {
 
     /// @inheritdoc IGhoRouter
     function swapFromsGHO(uint256 sghoAmount, uint256 minOutputAmount, address recipient) public returns (uint256) {
-        require(sghoAmount > 0, InvalidAmount());
-        require(recipient != address(0), ZeroAddress());
-
-        uint256 ghoAmount = _redeemSghoToGho(sghoAmount);
-        require(ghoAmount >= minOutputAmount, SlippageExceeded());
+        _validateInputs(sghoAmount, recipient);
+        uint256 ghoAmount = _redeemGho(sghoAmount, minOutputAmount);
 
         IERC20(GHO).safeTransfer(recipient, ghoAmount);
         emit SwapFromsGHO(msg.sender, sGHO, GHO, sghoAmount, ghoAmount, ghoAmount);
@@ -202,7 +186,7 @@ contract GhoRouter is Ownable, IGhoRouter {
         require(amount > 0, InvalidAmount());
         _requireAllowedGsm(gsm);
 
-        address stataToken = _validateAndGetStataToken(gsm, token);
+        address stataToken = _getStataToken(gsm, token);
         uint256 sharesAmount = token == stataToken ? amount : IStaticAToken(stataToken).previewDeposit(amount);
 
         (, uint256 ghoAmount,, uint256 fee) = IGSM(gsm).getGhoAmountForSellAsset(sharesAmount);
@@ -223,7 +207,7 @@ contract GhoRouter is Ownable, IGhoRouter {
         require(amount > 0, InvalidAmount());
         _requireAllowedGsm(gsm);
 
-        address stataToken = _validateAndGetStataToken(gsm, token);
+        address stataToken = _getStataToken(gsm, token);
         uint256 sharesAmount = token == stataToken ? amount : IStaticAToken(stataToken).previewDeposit(amount);
         (, uint256 ghoAmount,, uint256 fee) = IGSM(gsm).getGhoAmountForSellAsset(sharesAmount);
 
@@ -253,17 +237,21 @@ contract GhoRouter is Ownable, IGhoRouter {
         return IERC4626(sGHO).previewRedeem(sghoAmount);
     }
 
-    function _depositGhoToSgho(uint256 ghoAmount, address receiver) internal returns (uint256) {
+    function _depositToSgho(uint256 ghoAmount, address receiver, uint256 minSghoAmount) internal returns (uint256) {
         IERC20(GHO).forceApprove(sGHO, ghoAmount);
-        return IERC4626(sGHO).deposit(ghoAmount, receiver);
+        uint256 sghoAmount = IERC4626(sGHO).deposit(ghoAmount, receiver);
+        require(sghoAmount >= minSghoAmount, SlippageExceeded());
+        return sghoAmount;
     }
 
-    function _redeemSghoToGho(uint256 sghoAmount) internal returns (uint256) {
+    function _redeemGho(uint256 sghoAmount, uint256 minGhoAmount) internal returns (uint256) {
         IERC20(sGHO).safeTransferFrom(msg.sender, address(this), sghoAmount);
-        return IERC4626(sGHO).redeem(sghoAmount, address(this), address(this));
+        uint256 ghoAmount = IERC4626(sGHO).redeem(sghoAmount, address(this), address(this));
+        require(ghoAmount >= minGhoAmount, SlippageExceeded());
+        return ghoAmount;
     }
 
-    function _sellTokenForGho(address gsm, address token, address stataToken, uint256 amount)
+    function _sellTokenForGho(address gsm, address token, address stataToken, uint256 amount, uint256 minGhoAmount)
         internal
         returns (uint256, uint256)
     {
@@ -274,21 +262,31 @@ contract GhoRouter is Ownable, IGhoRouter {
         }
 
         IERC20(stataToken).forceApprove(gsm, stataAmount);
-        (, uint256 ghoAmount) = IGSM(gsm).sellAsset(stataAmount, address(this));
+        (uint256 assetSold, uint256 ghoAmount) = IGSM(gsm).sellAsset(stataAmount, address(this));
+
+        if (assetSold < stataAmount) {
+            IStaticAToken(stataToken).redeem(stataAmount - assetSold, msg.sender, address(this));
+        }
+
+        require(ghoAmount >= minGhoAmount, SlippageExceeded());
         return (amount, ghoAmount);
     }
 
-    function _buyUnderlyingWithGho(address gsm, address stataToken, uint256 ghoAmount, address outputReceiver)
-        internal
-        returns (uint256, uint256)
-    {
+    function _buyUnderlyingWithGho(
+        address gsm,
+        address stataToken,
+        uint256 ghoAmount,
+        address outputReceiver,
+        uint256 minOutputAmount
+    ) internal returns (uint256, uint256) {
         (uint256 stataAmountToBuy,,,) = IGSM(gsm).getAssetAmountForBuyAsset(ghoAmount);
 
         IERC20(GHO).forceApprove(gsm, ghoAmount);
-        (uint256 stataAmount, uint256 ghoBurned) = IGSM(gsm).buyAsset(stataAmountToBuy, address(this));
+        (uint256 stataAmount, uint256 ghoSold) = IGSM(gsm).buyAsset(stataAmountToBuy, address(this));
 
         uint256 outputAmount = IStaticAToken(stataToken).redeem(stataAmount, outputReceiver, address(this));
-        return (outputAmount, ghoBurned);
+        require(outputAmount >= minOutputAmount, SlippageExceeded());
+        return (outputAmount, ghoSold);
     }
 
     function _previewBuyUnderlyingWithGho(address gsm, address stataToken, uint256 ghoAmount)
@@ -315,14 +313,20 @@ contract GhoRouter is Ownable, IGhoRouter {
         require(IStaticAToken(stataToken).asset() != address(0), InvalidToken());
     }
 
-    function _getTokensFromGsm(address gsm) internal view returns (address token, address stataToken) {
-        stataToken = IGSM(gsm).UNDERLYING_ASSET();
-        token = IStaticAToken(stataToken).asset();
+    function _getTokensFromGsm(address gsm) internal view returns (address, address) {
+        address stataToken = IGSM(gsm).UNDERLYING_ASSET();
+        address token = IStaticAToken(stataToken).asset();
+        return (token, stataToken);
     }
 
-    function _validateAndGetStataToken(address gsm, address token) internal view returns (address) {
+    function _getStataToken(address gsm, address token) internal view returns (address) {
         (address underlyingToken, address stataToken) = _getTokensFromGsm(gsm);
         require(token == underlyingToken || token == stataToken, InvalidToken());
         return stataToken;
+    }
+
+    function _validateInputs(uint256 amount, address recipient) internal pure {
+        require(amount > 0, InvalidAmount());
+        require(recipient != address(0), ZeroAddress());
     }
 }

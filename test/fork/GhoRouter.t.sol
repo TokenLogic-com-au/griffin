@@ -44,9 +44,10 @@ contract GhoRouterTest is Test {
     // Test user address
     address constant USER = address(0xF00DBA11);
     address constant RECIPIENT = address(0xCAFEF00D);
+    uint256 constant MAINNET_FORK_BLOCK = 24_001_794;
 
     function setUp() public {
-        vm.createSelectFork(vm.rpcUrl("mainnet"));
+        vm.createSelectFork(vm.rpcUrl("mainnet"), MAINNET_FORK_BLOCK);
 
         sGho sghoImpl = new sGho();
         sgho = sGho(
@@ -59,27 +60,6 @@ contract GhoRouterTest is Test {
         router = new GhoRouter(address(this), GHO, address(sgho));
         router.setGsmAllowed(GSM_USDC, true);
         router.setGsmAllowed(GSM_USDT, true);
-    }
-
-    function _primeSwapToGhoCapacity(address gsm) internal {
-        uint256[4] memory ghoAttempts =
-            [uint256(5_000 ether), uint256(1_000 ether), uint256(100 ether), uint256(10 ether)];
-
-        for (uint256 i = 0; i < ghoAttempts.length; i++) {
-            (, uint256 ghoAmount,,) = IGSM(gsm).getAssetAmountForBuyAsset(ghoAttempts[i]);
-            if (ghoAmount == 0) {
-                continue;
-            }
-            deal(GHO, USER, ghoAmount);
-
-            vm.startPrank(USER);
-            IERC20(GHO).approve(address(router), ghoAmount);
-            router.swapFromGHO(gsm, ghoAmount, 0);
-            vm.stopPrank();
-            return;
-        }
-
-        revert("failed to prime GSM");
     }
 }
 
@@ -103,8 +83,6 @@ contract GsmWhitelistTest is GhoRouterTest {
 contract SwapToGHOTest is GhoRouterTest {
     function test_swap_usdc_to_gho() public {
         uint256 usdcAmount = 1000 * 1e6; // 1000 USDC
-
-        _primeSwapToGhoCapacity(GSM_USDC);
         deal(USDC, USER, usdcAmount);
 
         vm.startPrank(USER);
@@ -121,8 +99,6 @@ contract SwapToGHOTest is GhoRouterTest {
 
     function test_swap_usdt_to_gho() public {
         uint256 usdtAmount = 1000 * 1e6; // 1000 USDT
-
-        _primeSwapToGhoCapacity(GSM_USDT);
         deal(USDT, USER, usdtAmount);
 
         vm.startPrank(USER);
@@ -139,8 +115,6 @@ contract SwapToGHOTest is GhoRouterTest {
 
     function test_swap_usdc_to_gho_with_recipient() public {
         uint256 usdcAmount = 1000 * 1e6;
-
-        _primeSwapToGhoCapacity(GSM_USDC);
         deal(USDC, USER, usdcAmount);
 
         vm.startPrank(USER);
@@ -165,8 +139,6 @@ contract SwapToGHOTest is GhoRouterTest {
 
     function test_reverts_swap_to_gho_slippage_exceeded() public {
         uint256 usdcAmount = 1000 * 1e6; // 1000 USDC
-
-        _primeSwapToGhoCapacity(GSM_USDC);
         deal(USDC, USER, usdcAmount);
 
         vm.startPrank(USER);
@@ -323,8 +295,6 @@ contract SwapFromGHOTest is GhoRouterTest {
 contract SwapTosGHOTest is GhoRouterTest {
     function test_swap_usdc_to_sgho() public {
         uint256 usdcAmount = 1000 * 1e6;
-
-        _primeSwapToGhoCapacity(GSM_USDC);
         deal(USDC, USER, usdcAmount);
 
         vm.startPrank(USER);
@@ -340,8 +310,6 @@ contract SwapTosGHOTest is GhoRouterTest {
 
     function test_swap_usdt_to_sgho() public {
         uint256 usdtAmount = 1000 * 1e6;
-
-        _primeSwapToGhoCapacity(GSM_USDT);
         deal(USDT, USER, usdtAmount);
 
         vm.startPrank(USER);
@@ -385,7 +353,9 @@ contract SwapTosGHOTest is GhoRouterTest {
 
         assertEq(shares, ghoAmount, "sGHO copy should mint 1:1 shares at initial index");
         assertEq(
-            IERC20(address(sgho)).balanceOf(RECIPIENT) - recipientBalanceBefore, shares, "Recipient should receive shares"
+            IERC20(address(sgho)).balanceOf(RECIPIENT) - recipientBalanceBefore,
+            shares,
+            "Recipient should receive shares"
         );
         assertEq(IERC20(address(sgho)).balanceOf(USER), userBalanceBefore, "Caller should not receive shares");
     }
@@ -457,7 +427,9 @@ contract SwapFromsGHOTest is GhoRouterTest {
         vm.stopPrank();
 
         assertEq(outputAmount, ghoAmount, "Should redeem to full GHO amount");
-        assertEq(IERC20(GHO).balanceOf(RECIPIENT) - recipientBalanceBefore, outputAmount, "Recipient should receive GHO");
+        assertEq(
+            IERC20(GHO).balanceOf(RECIPIENT) - recipientBalanceBefore, outputAmount, "Recipient should receive GHO"
+        );
         assertEq(IERC20(GHO).balanceOf(USER), userBalanceBefore, "Caller should not receive GHO");
     }
 
