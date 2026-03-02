@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 /**
  * @title IGSM
  * @author Aave
- * @notice Minimal interface for GHO Stability Module functions used by GSMRouter
+ * @notice Minimal interface for GHO Stability Module functions used by GhoRouter
  */
 interface IGSM {
     /**

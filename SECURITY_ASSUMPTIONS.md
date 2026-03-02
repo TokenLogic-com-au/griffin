@@ -1,59 +1,69 @@
-# GSMRouter Failure Modes and Security Assumptions
+# GhoRouter Failure Modes and Security Assumptions
 
 This document captures trust assumptions and failure modes for the current
 router implementation at:
 
-- `src/GSMRouter.sol`
+- `src/GhoRouter.sol`
 
 It is intended for integrators, operators, and reviewers.
 
 ## Scope and trust boundary
 
-`GSMRouter` orchestrates four flows:
+`GhoRouter` orchestrates six flows:
 
-- `swapToGHO(gsm, amount, minGHOAmount)` for GSM underlying -> GHO
-- `swapFromGHO(gsm, ghoAmount, minOutputAmount)` for GHO -> GSM underlying
-- `swapTosGHO(gsm, amount, minSGHOAmount)` for GSM underlying or GHO -> sGHO (in which case you pass zero address for gsm)
-- `swapFromsGHO(gsm, sghoAmount, minOutputAmount)` for sGHO -> GSM underlying or GHO (in which case you pass zero address for gsm)
+- `swapToGHO(gsm, token, amount, minGHOAmount[, recipient])` for GSM token -> GHO
+- `swapFromGHO(gsm[, token], ghoAmount, minOutputAmount[, recipient])` for GHO -> GSM underlying token/static aToken
+- `swapTosGHO(gsm, token, amount, minSGHOAmount[, recipient])` for GSM token -> sGHO
+- `swapTosGHO(ghoAmount, minSGHOAmount[, recipient])` for direct GHO -> sGHO
+- `swapFromsGHO(gsm[, token], sghoAmount, minOutputAmount[, recipient])` for sGHO -> GSM underlying token/static aToken
+- `swapFromsGHO(sghoAmount, minOutputAmount[, recipient])` for direct sGHO -> GHO
+
+Notes on overload behavior:
+
+- On output paths, overloads without `token` default to the GSM underlying token.
+- Token-aware overloads enforce `token` as either GSM underlying token or static aToken.
 
 Important shape of the current design:
 
 - `GHO` and `sGHO` are immutable constructor params.
-- `gsm` is caller-supplied on each swap/preview call.
-- Swap routes are gated by on-chain allowlist state in `gsmAllowed`.
+- `gsm` is caller-supplied on GSM paths.
+- GSM paths are gated by on-chain allowlist state in `isGsmAllowed`.
 - The router keeps no per-user accounting state.
 
-## Runtime route validation
+## GSM allowlist and validation model
 
-For non-zero `gsm`, `_getTokensFromGsm` validates on each call:
-
-- `gsm != address(0)` and `gsm.code.length != 0`
-- `IGSM(gsm).GHO_TOKEN() == GHO`
-- `IGSM(gsm).UNDERLYING_ASSET()` returns non-zero `stataToken`
-- `IStaticAToken(stataToken).asset()` returns non-zero underlying token
-
-This means routing is dynamic at runtime, not fixed at deployment.
-
-## GSM Allowlist (`gsmAllowed`)
-
-- Storage: `mapping(address => bool) public gsmAllowed`.
+- Storage: `mapping(address => bool) public isGsmAllowed`.
 - Update path: `setGsmAllowed(address gsm, bool allowed)` (`onlyOwner`).
 - Update constraints:
   - `gsm != address(0)` always.
-  - Enabling (`allowed = true`) requires `gsm.code.length != 0`.
+  - Enabling (`allowed = true`) runs `_validateGsm(gsm)`:
+    - `gsm.code.length != 0`
+    - `IGSM(gsm).GHO_TOKEN() == GHO`
+    - `IGSM(gsm).UNDERLYING_ASSET() != address(0)`
+    - `IStaticAToken(stataToken).asset() != address(0)`
 - Swap enforcement:
-  - `swapToGHO` and `swapFromGHO` always require `gsmAllowed[gsm] == true`.
-  - `swapTosGHO` and `swapFromsGHO` require allowlisted `gsm` only when `gsm != address(0)`.
-  - Direct `GHO <-> sGHO` path (`gsm == address(0)`) bypasses allowlist checks by design.
+  - All GSM swap overloads require `isGsmAllowed[gsm] == true`.
+  - Direct `GHO <-> sGHO` overloads do not use allowlist checks.
 - Observability: `GsmAllowedUpdated(gsm, allowed)` is emitted on every update.
-- Important caveat: preview methods do not enforce `gsmAllowed`; they only perform route/interface validation.
+
+## Runtime route composition
+
+For GSM paths, token resolution at execution time is dynamic:
+
+- Router reads `IGSM(gsm).UNDERLYING_ASSET()` to get `stataToken`.
+- Router reads `IStaticAToken(stataToken).asset()` to get the underlying token.
+
+Important caveat:
+
+- `_validateGsm` checks compatibility when allowlisting is enabled, not on every swap.
+- Preview methods also do not enforce `isGsmAllowed`.
 
 ## Security assumptions
 
 The current implementation assumes:
 
-1. Owner securely manages `gsmAllowed` and curates safe GSM addresses.
-2. `IGSM` and `IStaticAToken` dependencies are interface-compatible and non-malicious.
+1. Owner securely manages `isGsmAllowed` and curates safe GSM addresses.
+2. `IGSM`, `IStaticAToken`, and `sGHO` dependencies are interface-compatible and non-malicious.
 3. `sGHO` is a valid ERC4626 vault over GHO (constructor does not enforce `asset() == GHO`).
 4. External dependency return values are correct (router accounting uses returned values).
 5. Underlying tokens involved in selected routes have ERC20 semantics compatible with `SafeERC20`.
@@ -62,25 +72,23 @@ The current implementation assumes:
 
 ## Security properties in the current implementation
 
-- Slippage checks are enforced on all write flows:
+- Slippage checks are enforced on write flows via `SlippageExceeded`:
   - `minGHOAmount`, `minOutputAmount`, `minSGHOAmount`
-- Swap calls (except direct `gsm == address(0)` sGHO paths) are gated by `gsmAllowed`.
-- Partial-consumption dust handling is present for GSM buy/sell paths:
-  - Underlying dust returned on `_sellUnderlyingForGho`
-  - GHO dust returned on `_buyUnderlyingWithGho`
-  - `DustReturned` is emitted
-- Approvals are exact and cleaned up for GSM/sGHO spenders:
-  - `GHO -> gsm` is zeroed after `buyAsset`
-  - `stataToken -> gsm` is zeroed after `sellAsset`
-  - `GHO -> sGHO` is zeroed after `deposit`
-- `rescueToken` is `onlyOwner`
+- Recipient is validated as non-zero on all write flows.
+- GSM write flows are gated by `isGsmAllowed`.
+- Token-aware GSM write flows enforce output/input token compatibility (`underlying` or `static aToken`).
+- Partial sell handling exists on GSM sell paths:
+  - If `sellAsset` consumes less than requested shares, remaining shares are redeemed to `msg.sender`.
+- `rescueToken` is `onlyOwner`.
 
 Limitations of current implementation:
 
 - No internal pause/circuit-breaker.
 - No explicit reentrancy guard.
-- Input-token approval to `stataToken` in `_sellUnderlyingForGho` is not reset to zero.
+- No on-swap revalidation of GSM `GHO_TOKEN`.
 - Preview methods can return quotes for non-allowlisted GSMs.
+- The router does not explicitly reset allowances to zero after each operation.
+- On GSM buy paths, if `buyAsset` spends less than transferred GHO, leftover GHO can remain in the router.
 
 ## Documented failure modes
 
@@ -90,14 +98,14 @@ What can happen:
 - Swaps revert or settle unexpectedly if GSM/static aToken/sGHO/token dependencies fail.
 
 Why:
-- Router delegates pricing/settlement to external contracts.
+- Router delegates pricing and settlement to external contracts.
 
 Impact:
 - Route unavailable or economically unsafe.
 
 Current mitigation:
 - Fail-fast reverts.
-- External monitoring and route-level disabling by integrators/operators.
+- External monitoring and route-level disabling by operators.
 
 ### 2) GSM allowlist misconfiguration or admin compromise
 
@@ -105,76 +113,76 @@ What can happen:
 - Valid routes can be unintentionally disabled, or unsafe routes can be enabled.
 
 Why:
-- Allowlist changes are owner-controlled via `setGsmAllowed`.
+- Allowlist updates are owner-controlled.
 
 Impact:
 - Route outage or exposure to undesired GSM risk.
 
 Current mitigation:
-- `onlyOwner` protection on updates.
-- `GsmAllowedUpdated` event monitoring and operational controls around ownership.
+- `onlyOwner` protection and `GsmAllowedUpdated` monitoring.
 
-### 3) Runtime route composition drift
+### 3) Route drift after allowlisting
 
 What can happen:
-- A previously acceptable `gsm` can begin routing to different components over time.
+- A previously accepted `gsm` can change behavior over time.
 
 Why:
-- Router re-reads `UNDERLYING_ASSET()` and `asset()` at runtime on every call.
+- Underlying route components are re-read at runtime, while `_validateGsm` is only checked on enable.
 
 Impact:
 - Route behavior can change without router redeploy.
 
 Current mitigation:
-- Operational monitoring of downstream config/governance changes.
-- Owner-managed allowlist/circuit-breaker controls.
+- Monitor downstream upgrades/config and disable affected GSM entries quickly.
 
 ### 4) Preview/allowlist mismatch and quote staleness
 
 What can happen:
-- Preview calls can succeed for a GSM that later reverts on swap due to `GsmNotAllowed`.
-- Preview outputs can also differ from write-call outcomes due to dynamic fees/rates.
+- Preview calls can succeed but swap later reverts with `GsmNotAllowed`.
+- Preview outputs can differ from write-call outcomes due to dynamic fees/rates/capacity.
 
 Why:
-- Preview methods do not enforce `gsmAllowed`.
-- GSM fee/capacity and vault exchange rates can change between preview and execution.
+- Preview methods do not enforce `isGsmAllowed`.
+- External pricing state can change between quote and execution.
 
 Impact:
-- Quote UX mismatch, `GsmNotAllowed` revert, lower output, or `SlippageExceeded` revert.
+- Quote UX mismatch, revert, or lower output.
 
 Current mitigation:
 - Execution-time minimum output checks.
-- Conservative slippage buffers by integrators/users.
-- Integrators should check `gsmAllowed(gsm)` before swap submission.
+- Conservative slippage buffers.
+- Integrators should check `isGsmAllowed(gsm)` before submitting GSM swaps.
 
-### 5) GSM capacity and partial consumption
-
-What can happen:
-- GSM may consume less than requested input or requested GHO budget.
-
-Why:
-- Capacity/matching are external.
-
-Impact:
-- Dust returns and lower-than-requested fill.
-
-Current mitigation:
-- Dust-return logic plus `DustReturned` event.
-- Slippage minimums.
-
-### 6) sGHO compatibility / misconfiguration risk
+### 5) Partial consumption and residual balances
 
 What can happen:
-- `swapTosGHO`/`swapFromsGHO` may revert or behave unexpectedly.
+- Requested amounts are not fully consumed by downstream contracts.
+- Leftover router balances may appear (especially GHO on buy paths).
 
 Why:
-- Constructor only checks `sgho != address(0)`; it does not enforce ERC4626 asset compatibility.
+- GSM buy/sell paths can partially fill based on external conditions.
 
 Impact:
-- Broken path or fund loss if deployed with the wrong vault.
+- Accounting mismatch vs requested input and potential stranded funds in router.
 
 Current mitigation:
-- Deployment hygiene and post-deploy verification.
+- Slippage checks on outputs.
+- Owner-operated `rescueToken` for recovery.
+- Balance monitoring by operators.
+
+### 6) sGHO compatibility or misconfiguration
+
+What can happen:
+- `swapTosGHO`/`swapFromsGHO` paths may revert or behave unexpectedly.
+
+Why:
+- Constructor checks only `sgho != address(0)` and does not verify vault asset compatibility.
+
+Impact:
+- Broken path or fund-loss risk if deployed with an incompatible vault.
+
+Current mitigation:
+- Deployment hygiene and post-deploy validation.
 
 ### 7) Non-standard token behavior
 
@@ -182,48 +190,48 @@ What can happen:
 - Fee-on-transfer/rebasing/non-standard approval semantics can break path assumptions.
 
 Why:
-- Router assumes compatible ERC20 transfer/approval behavior along selected routes.
+- Router assumes compatible ERC20 behavior on selected routes.
 
 Impact:
 - Reverts or unexpected settlement.
 
 Current mitigation:
-- `SafeERC20`/`forceApprove` usage.
-- Restrict routes to known-compatible assets.
+- `SafeERC20` and known-asset route curation.
 
-### 8) Residual allowance and stranded-fund risk
+### 8) Residual allowance risk
 
 What can happen:
-- If tokens are stranded in router, previously granted allowance to `stataToken` may be spendable.
+- If funds are stranded in the router, approved spenders may retain pull capability.
 
 Why:
-- Input token approval to `stataToken` is set per call but not explicitly reset to zero.
+- Allowances set via `forceApprove` are not explicitly cleared after calls.
 
 Impact:
-- Recovery complexity or potential token pull by approved spender, depending on token semantics.
+- Recovery complexity and increased dependency trust surface.
 
 Current mitigation:
-- Keep router stateless operationally and monitor balances.
-- Use `rescueToken` governance process for recovery.
+- Keep router balances near zero operationally.
+- Monitor allowances and balances.
+- Use `rescueToken` under controlled governance.
 
 ### 9) Owner rescue authority
 
 What can happen:
-- Owner can withdraw any ERC20 held by router using `rescueToken`.
+- Owner can withdraw any ERC20 held by router.
 
 Why:
-- Function is intentionally broad for operational recovery.
+- `rescueToken` is intentionally broad for recovery.
 
 Impact:
-- Centralization/key-management risk.
+- Centralization and key-management risk.
 
 Current mitigation:
-- Use trusted ownership (preferably multisig/governance) and monitor rescue actions.
+- Multisig/governance ownership and event monitoring.
 
 ## Integrator guidance
 
-1. Monitor `GsmAllowedUpdated` and verify `gsmAllowed(gsm)` before submitting swaps.
+1. Monitor `GsmAllowedUpdated` and verify `isGsmAllowed(gsm)` before GSM swaps.
 2. Quote immediately before execution and set conservative minimum outputs.
-3. Monitor `DustReturned` events and reconcile requested vs consumed amounts.
-4. Alert on downstream upgrades/pauses/parameter changes for GSM/static aToken/sGHO.
+3. Monitor router token balances for residual/stuck funds.
+4. Alert on downstream GSM/static aToken/sGHO upgrades, pauses, and parameter changes.
 5. Treat fork tests as integration smoke tests, not full economic assurance.

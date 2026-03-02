@@ -1,59 +1,45 @@
 # GHO Router for GSM
 
-`GSMRouter` is a stateless swap router for GSM routes plus sGHO.
+`GhoRouter` is a stateless swap router for GSM routes plus direct `GHO <-> sGHO`.
 
 Supported flows:
-- GSM underlying -> GHO
-- GHO -> GSM underlying
-- GSM underlying or GHO -> sGHO
-- sGHO -> GHO or GSM underlying
+- GSM underlying/static aToken -> GHO
+- GHO -> GSM underlying/static aToken
+- GSM underlying/static aToken -> sGHO
+- GHO -> sGHO (direct)
+- sGHO -> GSM underlying/static aToken
+- sGHO -> GHO (direct)
 
 Contract path:
-- `src/GSMRouter.sol`
+- `src/GhoRouter.sol`
 
 Interface paths:
-- `src/interfaces/IGSMRouter.sol`
+- `src/interfaces/IGhoRouter.sol`
 - `src/interfaces/IGSM.sol`
 - `src/interfaces/IStaticAToken.sol`
 
 ## How routing works today
 
-- Only `GHO` and `sGHO` are immutable constructor params.
-- The GSM route is provided per call (`address gsm`).
-- Swap paths are gated by `mapping(address => bool) public gsmAllowed`.
-- Each call validates `gsm` at runtime via `_getTokensFromGsm`:
-  - `gsm` must be a contract
-  - `IGSM(gsm).GHO_TOKEN()` must match router `GHO`
-  - `IGSM(gsm).UNDERLYING_ASSET()` must return a non-zero static aToken
-  - `IStaticAToken(asset).asset()` must return a non-zero underlying token
+- `GHO` and `sGHO` are immutable constructor params.
+- GSM routes are selected per call (`address gsm`).
+- GSM swap paths are gated by `mapping(address => bool) public isGsmAllowed`.
+- Direct `GHO <-> sGHO` paths use dedicated overloads without a `gsm` argument.
 
-### `gsmAllowed` details
+### `isGsmAllowed` details
 
-- Storage: `mapping(address => bool) public gsmAllowed`.
+- Storage: `mapping(address => bool) public isGsmAllowed`.
 - Admin: `setGsmAllowed(address gsm, bool allowed)` is `onlyOwner`.
-- Validation in `setGsmAllowed`:
-  - `gsm` cannot be `address(0)`.
-  - When `allowed == true`, `gsm` must have bytecode (`gsm.code.length != 0`).
 - Event: `GsmAllowedUpdated(gsm, allowed)` is emitted on updates.
 - Enforcement:
-  - `swapToGHO` and `swapFromGHO` require `gsmAllowed[gsm] == true`.
-  - `swapTosGHO` and `swapFromsGHO` require allowlisted `gsm` only when `gsm != address(0)`.
-  - Direct `GHO <-> sGHO` path (`gsm == address(0)`) is intentionally allowed for those two methods.
-- Current behavior: preview methods do not check `gsmAllowed`; they only run route/interface validation.
+  - All GSM swap overloads (`swapToGHO`, `swapFromGHO`, `swapTosGHO(gsm,...)`, `swapFromsGHO(gsm,...)`) require `isGsmAllowed[gsm] == true`.
+  - Direct `GHO <-> sGHO` overloads do not use allowlist checks.
+- Preview caveat: preview methods do not check `isGsmAllowed`.
 
-## Public API
+### Token selection on GSM paths
 
-- `swapToGHO(address gsm, uint256 amount, uint256 minGHOAmount) -> uint256`
-- `swapFromGHO(address gsm, uint256 ghoAmount, uint256 minOutputAmount) -> uint256`
-- `swapTosGHO(address gsm, uint256 amount, uint256 minSGHOAmount) -> uint256`
-- `swapFromsGHO(address gsm, uint256 sghoAmount, uint256 minOutputAmount) -> uint256`
-- `setGsmAllowed(address gsm, bool allowed)` (`onlyOwner`)
-- `previewSwapToGHO(address gsm, uint256 amount) -> (uint256 ghoAmount, uint256 fee)`
-- `previewSwapFromGHO(address gsm, uint256 ghoAmount) -> (uint256 assetAmount, uint256 fee)`
-- `previewSwapTosGHO(address gsm, uint256 amount) -> (uint256 sghoAmount, uint256 fee)`
-- `previewSwapFromsGHO(address gsm, uint256 sghoAmount) -> (uint256 outputAmount, uint256 fee)`
-- `gsmAllowed(address gsm) -> bool`
-- `rescueToken(address token, address to, uint256 amount)` (`onlyOwner`)
+- For `swapToGHO` and `swapTosGHO`, `token` is the input token and must be the GSM underlying token or its static aToken.
+- For token-aware `swapFromGHO` and `swapFromsGHO`, `token` is the output token and must be the GSM underlying token or its static aToken.
+- Overloads without a `token` argument default to the GSM underlying token on output paths.
 
 ## Setup
 
@@ -83,23 +69,26 @@ forge test
 Run fork tests only (requires `RPC_MAINNET`):
 
 ```bash
-forge test --match-path test/fork/GSMRouter.t.sol -vvv
+forge test --match-path test/fork/GhoRouter.t.sol -vvv
 ```
 
-## Deployment
+List tests in the fork suite:
 
-This repository currently does not include a checked-in deployment script under `script/`.
-
-Constructor:
-- `constructor(address owner, address gho, address sgho)`
+```bash
+forge test --match-path test/fork/GhoRouter.t.sol --list
+```
 
 ## Mainnet references used in fork tests
 
 - GHO: [`0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f`](https://etherscan.io/address/0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f)
+
 - GSM USDC: [`0xFeeb6FE430B7523fEF2a38327241eE7153779535`](https://etherscan.io/address/0xFeeb6FE430B7523fEF2a38327241eE7153779535)
-- GSM USDT: [`0x535b2f7C20B9C83d70e519cf9991578eF9816B7B`](https://etherscan.io/address/0x535b2f7C20B9C83d70e519cf9991578eF9816B7B)
 - USDC: [`0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48`](https://etherscan.io/address/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48)
+- StataUSDC: [`0xD4fa2D31b7968E448877f69A96DE69f5de8cD23E`](https://etherscan.io/address/0xD4fa2D31b7968E448877f69A96DE69f5de8cD23E)
+
+- GSM USDT: [`0x535b2f7C20B9C83d70e519cf9991578eF9816B7B`](https://etherscan.io/address/0x535b2f7C20B9C83d70e519cf9991578eF9816B7B)
 - USDT: [`0xdAC17F958D2ee523a2206206994597C13D831ec7`](https://etherscan.io/address/0xdAC17F958D2ee523a2206206994597C13D831ec7)
+- StataUSDT: [`0x7Bc3485026Ac48b6cf9BaF0A377477Fff5703Af8`](https://etherscan.io/address/0x7Bc3485026Ac48b6cf9BaF0A377477Fff5703Af8)
 
 ## Security
 
@@ -108,21 +97,6 @@ Status: not yet audited.
 Security assumptions and failure modes are documented in:
 - `SECURITY_ASSUMPTIONS.md`
 
-## Repository layout
-
-```text
-src/
-  GSMRouter.sol
-  interfaces/
-    IGSM.sol
-    IGSMRouter.sol
-    IStaticAToken.sol
-    IsGho.sol
-test/
-  fork/
-    GSMRouter.t.sol
-    mocks/sGho.sol
-```
 
 ## License
 

@@ -211,6 +211,23 @@ contract SwapFromGHOTest is GhoRouterTest {
         vm.stopPrank();
     }
 
+    function test_swap_gho_to_stata_usdc() public {
+        uint256 ghoAmount = 100 ether;
+        deal(GHO, USER, ghoAmount);
+
+        vm.startPrank(USER);
+        IERC20(GHO).approve(address(router), ghoAmount);
+
+        uint256 userBalanceBefore = IERC20(STATA_USDC).balanceOf(USER);
+        vm.expectEmit(true, true, false, false);
+        emit IGhoRouter.SwapFromGHO(USER, STATA_USDC, 0, 0);
+        uint256 stataReceived = router.swapFromGHO(GSM_USDC, STATA_USDC, ghoAmount, 1);
+        vm.stopPrank();
+
+        assertGt(stataReceived, 0, "Should receive static aToken");
+        assertEq(IERC20(STATA_USDC).balanceOf(USER) - userBalanceBefore, stataReceived, "User gets static aToken");
+    }
+
     function test_swap_gho_to_usdc_with_recipient() public {
         uint256 ghoAmount = 100 ether;
 
@@ -261,6 +278,13 @@ contract SwapFromGHOTest is GhoRouterTest {
         vm.stopPrank();
     }
 
+    function test_reverts_swap_from_gho_invalid_token() public {
+        vm.startPrank(USER);
+        vm.expectRevert(IGhoRouter.InvalidToken.selector);
+        router.swapFromGHO(GSM_USDC, GHO, 1 ether, 0);
+        vm.stopPrank();
+    }
+
     function test_reverts_swap_from_gho_zero_recipient() public {
         uint256 ghoAmount = 1 ether;
         deal(GHO, USER, ghoAmount);
@@ -288,6 +312,15 @@ contract SwapFromGHOTest is GhoRouterTest {
         (uint256 outputAmount, uint256 fee) = router.previewSwapFromGHO(GSM_USDC, ghoAmount);
 
         assertGt(outputAmount, 0, "Should preview output amount");
+        assertGe(fee, 0);
+    }
+
+    function test_preview_swap_from_gho_to_stata() public view {
+        uint256 ghoAmount = 1000 * 1e18;
+
+        (uint256 outputAmount, uint256 fee) = router.previewSwapFromGHO(GSM_USDC, STATA_USDC, ghoAmount);
+
+        assertGt(outputAmount, 0, "Should preview static aToken output amount");
         assertGe(fee, 0);
     }
 }
@@ -448,6 +481,27 @@ contract SwapFromsGHOTest is GhoRouterTest {
         assertEq(IERC20(address(sgho)).balanceOf(USER), 0, "User should spend all sGHO");
     }
 
+    function test_swap_sgho_to_stata_usdc() public {
+        uint256 ghoAmount = 100 ether;
+        _mintSgho(ghoAmount);
+
+        vm.startPrank(USER);
+        IERC20(address(sgho)).approve(address(router), ghoAmount);
+        uint256 userBalanceBefore = IERC20(STATA_USDC).balanceOf(USER);
+        vm.expectEmit(true, true, true, false);
+        emit IGhoRouter.SwapFromsGHO(USER, address(sgho), STATA_USDC, 0, 0, 0);
+        uint256 outputAmount = router.swapFromsGHO(GSM_USDC, STATA_USDC, ghoAmount, 1);
+        vm.stopPrank();
+
+        assertGt(outputAmount, 0, "Should receive static aToken");
+        assertEq(IERC20(address(sgho)).balanceOf(USER), 0, "User should spend all sGHO");
+        assertEq(
+            IERC20(STATA_USDC).balanceOf(USER) - userBalanceBefore,
+            outputAmount,
+            "User should receive static aToken output"
+        );
+    }
+
     function test_reverts_swap_from_sgho_zero_amount() public {
         vm.startPrank(USER);
         vm.expectRevert(IGhoRouter.InvalidAmount.selector);
@@ -491,5 +545,24 @@ contract SwapFromsGHOTest is GhoRouterTest {
         vm.expectRevert(IGhoRouter.GsmNotAllowed.selector);
         router.swapFromsGHO(GSM_USDC, 100 ether, 0);
         vm.stopPrank();
+    }
+
+    function test_reverts_swap_from_sgho_invalid_token() public {
+        _mintSgho(1 ether);
+
+        vm.startPrank(USER);
+        IERC20(address(sgho)).approve(address(router), 1 ether);
+        vm.expectRevert(IGhoRouter.InvalidToken.selector);
+        router.swapFromsGHO(GSM_USDC, GHO, 1 ether, 0);
+        vm.stopPrank();
+    }
+
+    function test_preview_swap_from_sgho_to_stata() public view {
+        uint256 shareAmount = 100 ether;
+
+        (uint256 outputAmount, uint256 fee) = router.previewSwapFromsGHO(GSM_USDC, STATA_USDC, shareAmount);
+
+        assertGt(outputAmount, 0, "Should preview static aToken output");
+        assertGe(fee, 0, "Fee check should not revert");
     }
 }
