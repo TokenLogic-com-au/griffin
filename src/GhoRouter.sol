@@ -165,8 +165,7 @@ contract GhoRouter is Ownable, IGhoRouter {
     function previewSwapToGHO(address gsm, address token, uint256 amount) external view returns (uint256, uint256) {
         require(amount > 0, InvalidAmount());
 
-        (address underlyingToken, address stataToken) = _getTokensFromGsm(gsm);
-        require(token == underlyingToken || token == stataToken, InvalidToken());
+        (, address stataToken) = _getTokensFromGsm(gsm, token);
         uint256 sharesAmount = token == stataToken ? amount : IStaticAToken(stataToken).previewDeposit(amount);
 
         (, uint256 ghoAmount,, uint256 fee) = IGSM(gsm).getGhoAmountForSellAsset(sharesAmount);
@@ -189,8 +188,7 @@ contract GhoRouter is Ownable, IGhoRouter {
     {
         require(ghoAmount > 0, InvalidAmount());
 
-        (address underlyingToken, address stataToken) = _getTokensFromGsm(gsm);
-        require(token == underlyingToken || token == stataToken, InvalidToken());
+        (, address stataToken) = _getTokensFromGsm(gsm, token);
         return _previewTokenWithGho(gsm, token, stataToken, ghoAmount);
     }
 
@@ -198,8 +196,7 @@ contract GhoRouter is Ownable, IGhoRouter {
     function previewSwapTosGHO(address gsm, address token, uint256 amount) external view returns (uint256, uint256) {
         require(amount > 0, InvalidAmount());
 
-        (address underlyingToken, address stataToken) = _getTokensFromGsm(gsm);
-        require(token == underlyingToken || token == stataToken, InvalidToken());
+        (, address stataToken) = _getTokensFromGsm(gsm, token);
         uint256 sharesAmount = token == stataToken ? amount : IStaticAToken(stataToken).previewDeposit(amount);
         (, uint256 ghoAmount,, uint256 fee) = IGSM(gsm).getGhoAmountForSellAsset(sharesAmount);
 
@@ -231,8 +228,7 @@ contract GhoRouter is Ownable, IGhoRouter {
         require(sghoAmount > 0, InvalidAmount());
 
         uint256 ghoAmount = IERC4626(sGHO).previewRedeem(sghoAmount);
-        (address underlyingToken, address stataToken) = _getTokensFromGsm(gsm);
-        require(token == underlyingToken || token == stataToken, InvalidToken());
+        (, address stataToken) = _getTokensFromGsm(gsm, token);
         return _previewTokenWithGho(gsm, token, stataToken, ghoAmount);
     }
 
@@ -257,8 +253,7 @@ contract GhoRouter is Ownable, IGhoRouter {
     {
         _validateInputs(amount, recipient, gsm);
 
-        (address underlyingToken, address stataToken) = _getTokensFromGsm(gsm);
-        require(token == underlyingToken || token == stataToken, InvalidToken());
+        (, address stataToken) = _getTokensFromGsm(gsm, token);
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
 
         (uint256 inputAmountUsed, uint256 ghoAmount) = _sellTokenForGho(gsm, token, stataToken, amount, minGHOAmount);
@@ -299,8 +294,7 @@ contract GhoRouter is Ownable, IGhoRouter {
     {
         _validateInputs(ghoAmount, recipient, gsm);
 
-        (address underlyingToken, address stataToken) = _getTokensFromGsm(gsm);
-        require(token == underlyingToken || token == stataToken, InvalidToken());
+        (, address stataToken) = _getTokensFromGsm(gsm, token);
         IERC20(GHO).safeTransferFrom(msg.sender, address(this), ghoAmount);
 
         (uint256 outputAmount, uint256 ghoSold) =
@@ -325,8 +319,7 @@ contract GhoRouter is Ownable, IGhoRouter {
     {
         _validateInputs(amount, recipient, gsm);
 
-        (address underlyingToken, address stataToken) = _getTokensFromGsm(gsm);
-        require(token == underlyingToken || token == stataToken, InvalidToken());
+        (, address stataToken) = _getTokensFromGsm(gsm, token);
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
 
         (uint256 inputAmountUsed, uint256 ghoAmount) = _sellTokenForGho(gsm, token, stataToken, amount, 0);
@@ -388,8 +381,7 @@ contract GhoRouter is Ownable, IGhoRouter {
         _validateInputs(sghoAmount, recipient, gsm);
 
         uint256 ghoAmount = _redeemGho(sghoAmount, 0);
-        (address underlyingToken, address stataToken) = _getTokensFromGsm(gsm);
-        require(outputToken == underlyingToken || outputToken == stataToken, InvalidToken());
+        (, address stataToken) = _getTokensFromGsm(gsm, outputToken);
 
         (uint256 outputAmount, uint256 ghoSold) =
             _buyTokenWithGho(gsm, outputToken, stataToken, ghoAmount, recipient, minOutputAmount);
@@ -550,6 +542,18 @@ contract GhoRouter is Ownable, IGhoRouter {
         address stataToken = IGSM(gsm).UNDERLYING_ASSET();
         address token = IStaticAToken(stataToken).asset();
         return (token, stataToken);
+    }
+
+    /**
+     * @dev Resolves the underlying token and static aToken for a GSM and validates a caller-selected token.
+     * @param gsm GSM address to query.
+     * @param token Token address that must match GSM underlying token or static aToken.
+     * @return underlyingToken Underlying token associated with the GSM static aToken.
+     * @return stataToken Static aToken configured in the GSM.
+     */
+    function _getTokensFromGsm(address gsm, address token) internal view returns (address underlyingToken, address stataToken) {
+        (underlyingToken, stataToken) = _getTokensFromGsm(gsm);
+        require(token == underlyingToken || token == stataToken, InvalidToken());
     }
 
     /**
