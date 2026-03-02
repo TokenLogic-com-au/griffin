@@ -551,7 +551,11 @@ contract GhoRouter is Ownable, IGhoRouter {
      * @return underlyingToken Underlying token associated with the GSM static aToken.
      * @return stataToken Static aToken configured in the GSM.
      */
-    function _getTokensFromGsm(address gsm, address token) internal view returns (address underlyingToken, address stataToken) {
+    function _getTokensFromGsm(address gsm, address token)
+        internal
+        view
+        returns (address underlyingToken, address stataToken)
+    {
         (underlyingToken, stataToken) = _getTokensFromGsm(gsm);
         require(token == underlyingToken || token == stataToken, InvalidToken());
     }

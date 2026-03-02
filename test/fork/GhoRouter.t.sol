@@ -10,7 +10,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {GhoRouter} from "src/GhoRouter.sol";
 import {IGhoRouter} from "src/interfaces/IGhoRouter.sol";
-import {IGSM} from "src/interfaces/IGSM.sol";
 import {sGho} from "test/fork/mocks/sGho.sol";
 
 /**
@@ -61,6 +60,25 @@ contract GhoRouterTest is Test {
         router.setGsmAllowed(GSM_USDC, true);
         router.setGsmAllowed(GSM_USDT, true);
     }
+
+    function _dealAndStartUserWithApproval(address token, address spender, uint256 amount) internal {
+        deal(token, USER, amount);
+        vm.startPrank(USER);
+        SafeERC20.forceApprove(IERC20(token), spender, amount);
+    }
+
+    function _dealAndStartUserWithRouterApproval(address token, uint256 amount) internal {
+        _dealAndStartUserWithApproval(token, address(router), amount);
+    }
+
+    function _startUserWithApproval(address token, address spender, uint256 amount) internal {
+        vm.startPrank(USER);
+        SafeERC20.forceApprove(IERC20(token), spender, amount);
+    }
+
+    function _startUserWithRouterApproval(address token, uint256 amount) internal {
+        _startUserWithApproval(token, address(router), amount);
+    }
 }
 
 contract GsmWhitelistTest is GhoRouterTest {
@@ -81,44 +99,26 @@ contract GsmWhitelistTest is GhoRouterTest {
 }
 
 contract SwapToGHOTest is GhoRouterTest {
-    function test_swap_usdc_to_gho() public {
-        uint256 usdcAmount = 1000 * 1e6; // 1000 USDC
-        deal(USDC, USER, usdcAmount);
-
-        vm.startPrank(USER);
-
-        IERC20(USDC).approve(address(router), usdcAmount);
+    function _assertSwapTokenToGho(address token, address gsm, uint256 amount) internal {
+        _dealAndStartUserWithRouterApproval(token, amount);
         vm.expectEmit(true, true, false, false);
-        emit IGhoRouter.SwapToGHO(USER, USDC, 0, 0);
-        uint256 ghoReceived = router.swapToGHO(GSM_USDC, USDC, usdcAmount, 0);
-
+        emit IGhoRouter.SwapToGHO(USER, token, 0, 0);
+        uint256 ghoReceived = router.swapToGHO(gsm, token, amount, 0);
         assertGt(ghoReceived, 0, "Should receive GHO");
-
         vm.stopPrank();
     }
 
+    function test_swap_usdc_to_gho() public {
+        _assertSwapTokenToGho(USDC, GSM_USDC, 1000 * 1e6);
+    }
+
     function test_swap_usdt_to_gho() public {
-        uint256 usdtAmount = 1000 * 1e6; // 1000 USDT
-        deal(USDT, USER, usdtAmount);
-
-        vm.startPrank(USER);
-
-        SafeERC20.forceApprove(IERC20(USDT), address(router), usdtAmount);
-        vm.expectEmit(true, true, false, false);
-        emit IGhoRouter.SwapToGHO(USER, USDT, 0, 0);
-        uint256 ghoReceived = router.swapToGHO(GSM_USDT, USDT, usdtAmount, 0);
-
-        assertGt(ghoReceived, 0, "Should receive GHO");
-
-        vm.stopPrank();
+        _assertSwapTokenToGho(USDT, GSM_USDT, 1000 * 1e6);
     }
 
     function test_swap_usdc_to_gho_with_recipient() public {
         uint256 usdcAmount = 1000 * 1e6;
-        deal(USDC, USER, usdcAmount);
-
-        vm.startPrank(USER);
-        IERC20(USDC).approve(address(router), usdcAmount);
+        _dealAndStartUserWithRouterApproval(USDC, usdcAmount);
 
         uint256 recipientBalanceBefore = IERC20(GHO).balanceOf(RECIPIENT);
         uint256 userBalanceBefore = IERC20(GHO).balanceOf(USER);
@@ -139,11 +139,7 @@ contract SwapToGHOTest is GhoRouterTest {
 
     function test_reverts_swap_to_gho_slippage_exceeded() public {
         uint256 usdcAmount = 1000 * 1e6; // 1000 USDC
-        deal(USDC, USER, usdcAmount);
-
-        vm.startPrank(USER);
-
-        IERC20(USDC).approve(address(router), usdcAmount);
+        _dealAndStartUserWithRouterApproval(USDC, usdcAmount);
 
         // Set unreasonably high minGHOAmount to trigger slippage
         vm.expectRevert(IGhoRouter.SlippageExceeded.selector);
@@ -177,46 +173,26 @@ contract SwapToGHOTest is GhoRouterTest {
 }
 
 contract SwapFromGHOTest is GhoRouterTest {
-    function test_swap_gho_to_usdc() public {
-        uint256 ghoAmount = 100 ether;
-
-        deal(GHO, USER, ghoAmount);
-
-        vm.startPrank(USER);
-
-        IERC20(GHO).approve(address(router), ghoAmount);
+    function _assertSwapGhoToToken(address token, address gsm, uint256 ghoAmount) internal {
+        _dealAndStartUserWithRouterApproval(GHO, ghoAmount);
         vm.expectEmit(true, true, false, false);
-        emit IGhoRouter.SwapFromGHO(USER, USDC, 0, 0);
-        uint256 usdcReceived = router.swapFromGHO(GSM_USDC, ghoAmount, 0);
-
-        assertGt(usdcReceived, 0, "Should receive USDC");
-
+        emit IGhoRouter.SwapFromGHO(USER, token, 0, 0);
+        uint256 outputAmount = router.swapFromGHO(gsm, ghoAmount, 0);
+        assertGt(outputAmount, 0, "Should receive output token");
         vm.stopPrank();
     }
 
+    function test_swap_gho_to_usdc() public {
+        _assertSwapGhoToToken(USDC, GSM_USDC, 100 ether);
+    }
+
     function test_swap_gho_to_usdt() public {
-        uint256 ghoAmount = 100 ether;
-
-        deal(GHO, USER, ghoAmount);
-
-        vm.startPrank(USER);
-
-        IERC20(GHO).approve(address(router), ghoAmount);
-        vm.expectEmit(true, true, false, false);
-        emit IGhoRouter.SwapFromGHO(USER, USDT, 0, 0);
-        uint256 usdtReceived = router.swapFromGHO(GSM_USDT, ghoAmount, 0);
-
-        assertGt(usdtReceived, 0, "Should receive USDT");
-
-        vm.stopPrank();
+        _assertSwapGhoToToken(USDT, GSM_USDT, 100 ether);
     }
 
     function test_swap_gho_to_stata_usdc() public {
         uint256 ghoAmount = 100 ether;
-        deal(GHO, USER, ghoAmount);
-
-        vm.startPrank(USER);
-        IERC20(GHO).approve(address(router), ghoAmount);
+        _dealAndStartUserWithRouterApproval(GHO, ghoAmount);
 
         uint256 userBalanceBefore = IERC20(STATA_USDC).balanceOf(USER);
         vm.expectEmit(true, true, false, false);
@@ -231,10 +207,7 @@ contract SwapFromGHOTest is GhoRouterTest {
     function test_swap_gho_to_usdc_with_recipient() public {
         uint256 ghoAmount = 100 ether;
 
-        deal(GHO, USER, ghoAmount);
-
-        vm.startPrank(USER);
-        IERC20(GHO).approve(address(router), ghoAmount);
+        _dealAndStartUserWithRouterApproval(GHO, ghoAmount);
 
         uint256 recipientBalanceBefore = IERC20(USDC).balanceOf(RECIPIENT);
         uint256 userBalanceBefore = IERC20(USDC).balanceOf(USER);
@@ -256,11 +229,7 @@ contract SwapFromGHOTest is GhoRouterTest {
     function test_reverts_swap_from_gho_slippage_exceeded() public {
         uint256 ghoAmount = 100 ether;
 
-        deal(GHO, USER, ghoAmount);
-
-        vm.startPrank(USER);
-
-        IERC20(GHO).approve(address(router), ghoAmount);
+        _dealAndStartUserWithRouterApproval(GHO, ghoAmount);
 
         // Set unreasonably high minOutputAmount to trigger slippage
         vm.expectRevert(IGhoRouter.SlippageExceeded.selector);
@@ -287,10 +256,7 @@ contract SwapFromGHOTest is GhoRouterTest {
 
     function test_reverts_swap_from_gho_zero_recipient() public {
         uint256 ghoAmount = 1 ether;
-        deal(GHO, USER, ghoAmount);
-
-        vm.startPrank(USER);
-        IERC20(GHO).approve(address(router), ghoAmount);
+        _dealAndStartUserWithRouterApproval(GHO, ghoAmount);
         vm.expectRevert(IGhoRouter.ZeroAddress.selector);
         router.swapFromGHO(GSM_USDC, ghoAmount, 0, address(0));
         vm.stopPrank();
@@ -326,43 +292,28 @@ contract SwapFromGHOTest is GhoRouterTest {
 }
 
 contract SwapTosGHOTest is GhoRouterTest {
-    function test_swap_usdc_to_sgho() public {
-        uint256 usdcAmount = 1000 * 1e6;
-        deal(USDC, USER, usdcAmount);
-
-        vm.startPrank(USER);
-        IERC20(USDC).approve(address(router), usdcAmount);
+    function _assertSwapTokenToSgho(address token, address gsm, uint256 amount) internal {
+        _dealAndStartUserWithRouterApproval(token, amount);
         vm.expectEmit(true, true, true, false);
-        emit IGhoRouter.SwapTosGHO(USER, USDC, address(sgho), 0, 0, 0);
-        uint256 shares = router.swapTosGHO(GSM_USDC, USDC, usdcAmount, 1);
-        vm.stopPrank();
-
+        emit IGhoRouter.SwapTosGHO(USER, token, address(sgho), 0, 0, 0);
+        uint256 shares = router.swapTosGHO(gsm, token, amount, 1);
         assertGt(shares, 0, "Should receive sGHO shares");
         assertEq(IERC20(address(sgho)).balanceOf(USER), shares, "User should receive minted shares");
+        vm.stopPrank();
+    }
+
+    function test_swap_usdc_to_sgho() public {
+        _assertSwapTokenToSgho(USDC, GSM_USDC, 1000 * 1e6);
     }
 
     function test_swap_usdt_to_sgho() public {
-        uint256 usdtAmount = 1000 * 1e6;
-        deal(USDT, USER, usdtAmount);
-
-        vm.startPrank(USER);
-        SafeERC20.forceApprove(IERC20(USDT), address(router), usdtAmount);
-        vm.expectEmit(true, true, true, false);
-        emit IGhoRouter.SwapTosGHO(USER, USDT, address(sgho), 0, 0, 0);
-        uint256 shares = router.swapTosGHO(GSM_USDT, USDT, usdtAmount, 1);
-        vm.stopPrank();
-
-        assertGt(shares, 0, "Should receive sGHO shares");
-        assertEq(IERC20(address(sgho)).balanceOf(USER), shares, "User should receive minted shares");
+        _assertSwapTokenToSgho(USDT, GSM_USDT, 1000 * 1e6);
     }
 
     function test_swap_gho_to_sgho() public {
         uint256 ghoAmount = 100 ether;
 
-        deal(GHO, USER, ghoAmount);
-
-        vm.startPrank(USER);
-        IERC20(GHO).approve(address(router), ghoAmount);
+        _dealAndStartUserWithRouterApproval(GHO, ghoAmount);
         vm.expectEmit(true, true, true, true);
         emit IGhoRouter.SwapTosGHO(USER, GHO, address(sgho), ghoAmount, ghoAmount, ghoAmount);
         uint256 shares = router.swapTosGHO(ghoAmount, ghoAmount);
@@ -375,10 +326,7 @@ contract SwapTosGHOTest is GhoRouterTest {
     function test_swap_gho_to_sgho_with_recipient() public {
         uint256 ghoAmount = 100 ether;
 
-        deal(GHO, USER, ghoAmount);
-
-        vm.startPrank(USER);
-        IERC20(GHO).approve(address(router), ghoAmount);
+        _dealAndStartUserWithRouterApproval(GHO, ghoAmount);
         uint256 recipientBalanceBefore = IERC20(address(sgho)).balanceOf(RECIPIENT);
         uint256 userBalanceBefore = IERC20(address(sgho)).balanceOf(USER);
         uint256 shares = router.swapTosGHO(ghoAmount, ghoAmount, RECIPIENT);
@@ -413,10 +361,7 @@ contract SwapTosGHOTest is GhoRouterTest {
 
     function test_reverts_swap_to_sgho_zero_recipient() public {
         uint256 ghoAmount = 1 ether;
-        deal(GHO, USER, ghoAmount);
-
-        vm.startPrank(USER);
-        IERC20(GHO).approve(address(router), ghoAmount);
+        _dealAndStartUserWithRouterApproval(GHO, ghoAmount);
         vm.expectRevert(IGhoRouter.ZeroAddress.selector);
         router.swapTosGHO(ghoAmount, 0, address(0));
         vm.stopPrank();
@@ -425,9 +370,7 @@ contract SwapTosGHOTest is GhoRouterTest {
 
 contract SwapFromsGHOTest is GhoRouterTest {
     function _mintSgho(uint256 ghoAmount) internal {
-        deal(GHO, USER, ghoAmount);
-        vm.startPrank(USER);
-        IERC20(GHO).approve(address(sgho), ghoAmount);
+        _dealAndStartUserWithApproval(GHO, address(sgho), ghoAmount);
         sgho.deposit(ghoAmount, USER);
         vm.stopPrank();
     }
@@ -436,8 +379,7 @@ contract SwapFromsGHOTest is GhoRouterTest {
         uint256 ghoAmount = 100 ether;
         _mintSgho(ghoAmount);
 
-        vm.startPrank(USER);
-        IERC20(address(sgho)).approve(address(router), ghoAmount);
+        _startUserWithRouterApproval(address(sgho), ghoAmount);
         vm.expectEmit(true, true, true, true);
         emit IGhoRouter.SwapFromsGHO(USER, address(sgho), GHO, ghoAmount, ghoAmount, ghoAmount);
         uint256 outputAmount = router.swapFromsGHO(ghoAmount, ghoAmount);
@@ -452,8 +394,7 @@ contract SwapFromsGHOTest is GhoRouterTest {
         uint256 ghoAmount = 100 ether;
         _mintSgho(ghoAmount);
 
-        vm.startPrank(USER);
-        IERC20(address(sgho)).approve(address(router), ghoAmount);
+        _startUserWithRouterApproval(address(sgho), ghoAmount);
         uint256 recipientBalanceBefore = IERC20(GHO).balanceOf(RECIPIENT);
         uint256 userBalanceBefore = IERC20(GHO).balanceOf(USER);
         uint256 outputAmount = router.swapFromsGHO(ghoAmount, ghoAmount, RECIPIENT);
@@ -470,8 +411,7 @@ contract SwapFromsGHOTest is GhoRouterTest {
         uint256 ghoAmount = 100 ether;
         _mintSgho(ghoAmount);
 
-        vm.startPrank(USER);
-        IERC20(address(sgho)).approve(address(router), ghoAmount);
+        _startUserWithRouterApproval(address(sgho), ghoAmount);
         vm.expectEmit(true, true, true, false);
         emit IGhoRouter.SwapFromsGHO(USER, address(sgho), USDC, 0, 0, 0);
         uint256 outputAmount = router.swapFromsGHO(GSM_USDC, ghoAmount, 1);
@@ -485,8 +425,7 @@ contract SwapFromsGHOTest is GhoRouterTest {
         uint256 ghoAmount = 100 ether;
         _mintSgho(ghoAmount);
 
-        vm.startPrank(USER);
-        IERC20(address(sgho)).approve(address(router), ghoAmount);
+        _startUserWithRouterApproval(address(sgho), ghoAmount);
         uint256 userBalanceBefore = IERC20(STATA_USDC).balanceOf(USER);
         vm.expectEmit(true, true, true, false);
         emit IGhoRouter.SwapFromsGHO(USER, address(sgho), STATA_USDC, 0, 0, 0);
@@ -512,8 +451,7 @@ contract SwapFromsGHOTest is GhoRouterTest {
     function test_reverts_swap_from_sgho_zero_recipient() public {
         _mintSgho(1 ether);
 
-        vm.startPrank(USER);
-        IERC20(address(sgho)).approve(address(router), 1 ether);
+        _startUserWithRouterApproval(address(sgho), 1 ether);
         vm.expectRevert(IGhoRouter.ZeroAddress.selector);
         router.swapFromsGHO(1 ether, 0, address(0));
         vm.stopPrank();
@@ -540,8 +478,7 @@ contract SwapFromsGHOTest is GhoRouterTest {
         router.setGsmAllowed(GSM_USDC, false);
         _mintSgho(100 ether);
 
-        vm.startPrank(USER);
-        IERC20(address(sgho)).approve(address(router), 100 ether);
+        _startUserWithRouterApproval(address(sgho), 100 ether);
         vm.expectRevert(IGhoRouter.GsmNotAllowed.selector);
         router.swapFromsGHO(GSM_USDC, 100 ether, 0);
         vm.stopPrank();
@@ -550,8 +487,7 @@ contract SwapFromsGHOTest is GhoRouterTest {
     function test_reverts_swap_from_sgho_invalid_token() public {
         _mintSgho(1 ether);
 
-        vm.startPrank(USER);
-        IERC20(address(sgho)).approve(address(router), 1 ether);
+        _startUserWithRouterApproval(address(sgho), 1 ether);
         vm.expectRevert(IGhoRouter.InvalidToken.selector);
         router.swapFromsGHO(GSM_USDC, GHO, 1 ether, 0);
         vm.stopPrank();
