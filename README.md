@@ -1,66 +1,103 @@
-## Foundry
+# GHO Router for GSM
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+`GhoRouter` is a stateless swap router for GSM routes plus direct `GHO <-> sGHO`.
 
-Foundry consists of:
+Supported flows:
+- GSM underlying/static aToken -> GHO
+- GHO -> GSM underlying/static aToken
+- GSM underlying/static aToken -> sGHO
+- GHO -> sGHO (direct)
+- sGHO -> GSM underlying/static aToken
+- sGHO -> GHO (direct)
 
-- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
-- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
-- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
-- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+Contract path:
+- `src/GhoRouter.sol`
 
-## Documentation
+Interface paths:
+- `src/interfaces/IGhoRouter.sol`
+- `src/interfaces/IGSM.sol`
+- `src/interfaces/IStaticAToken.sol`
 
-https://book.getfoundry.sh/
+## How routing works today
 
-## Usage
+- `GHO` and `sGHO` are immutable constructor params.
+- GSM routes are selected per call (`address gsm`).
+- GSM swap paths are gated by `mapping(address => bool) public isGsmAllowed`.
+- Direct `GHO <-> sGHO` paths use dedicated overloads without a `gsm` argument.
 
-### Build
+### `isGsmAllowed` details
 
-```shell
-$ forge build
+- Storage: `mapping(address => bool) public isGsmAllowed`.
+- Admin: `setGsmAllowed(address gsm, bool allowed)` is `onlyOwner`.
+- Event: `GsmAllowedUpdated(gsm, allowed)` is emitted on updates.
+- Enforcement:
+  - All GSM swap overloads (`swapToGHO`, `swapFromGHO`, `swapTosGHO(gsm,...)`, `swapFromsGHO(gsm,...)`) require `isGsmAllowed[gsm] == true`.
+  - Direct `GHO <-> sGHO` overloads do not use allowlist checks.
+- Preview caveat: preview methods do not check `isGsmAllowed`.
+
+### Token selection on GSM paths
+
+- For `swapToGHO` and `swapTosGHO`, `token` is the input token and must be the GSM underlying token or its static aToken.
+- For token-aware `swapFromGHO` and `swapFromsGHO`, `token` is the output token and must be the GSM underlying token or its static aToken.
+- Overloads without a `token` argument default to the GSM underlying token on output paths.
+
+## Setup
+
+```bash
+forge install
+forge build
 ```
 
-### Test
+Optional env file:
 
-```shell
-$ forge test
+```bash
+cp .env.example .env
 ```
 
-### Format
+Used by current config:
+- `RPC_MAINNET` (for fork tests / `vm.rpcUrl("mainnet")`)
+- `ETHERSCAN_API_KEY` (only if you verify contracts)
 
-```shell
-$ forge fmt
+## Testing
+
+Run all tests:
+
+```bash
+forge test
 ```
 
-### Gas Snapshots
+Run fork tests only (requires `RPC_MAINNET`):
 
-```shell
-$ forge snapshot
+```bash
+forge test --match-path test/fork/GhoRouter.t.sol -vvv
 ```
 
-### Anvil
+List tests in the fork suite:
 
-```shell
-$ anvil
+```bash
+forge test --match-path test/fork/GhoRouter.t.sol --list
 ```
 
-### Deploy
+## Mainnet references used in fork tests
 
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
+- GHO: [`0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f`](https://etherscan.io/address/0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f)
 
-### Cast
+- GSM USDC: [`0xFeeb6FE430B7523fEF2a38327241eE7153779535`](https://etherscan.io/address/0xFeeb6FE430B7523fEF2a38327241eE7153779535)
+- USDC: [`0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48`](https://etherscan.io/address/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48)
+- StataUSDC: [`0xD4fa2D31b7968E448877f69A96DE69f5de8cD23E`](https://etherscan.io/address/0xD4fa2D31b7968E448877f69A96DE69f5de8cD23E)
 
-```shell
-$ cast <subcommand>
-```
+- GSM USDT: [`0x535b2f7C20B9C83d70e519cf9991578eF9816B7B`](https://etherscan.io/address/0x535b2f7C20B9C83d70e519cf9991578eF9816B7B)
+- USDT: [`0xdAC17F958D2ee523a2206206994597C13D831ec7`](https://etherscan.io/address/0xdAC17F958D2ee523a2206206994597C13D831ec7)
+- StataUSDT: [`0x7Bc3485026Ac48b6cf9BaF0A377477Fff5703Af8`](https://etherscan.io/address/0x7Bc3485026Ac48b6cf9BaF0A377477Fff5703Af8)
 
-### Help
+## Security
 
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+Status: not yet audited.
+
+Security assumptions and failure modes are documented in:
+- `SECURITY_ASSUMPTIONS.md`
+
+
+## License
+
+MIT

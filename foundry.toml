@@ -4,7 +4,10 @@ out = "out"
 test = 'test'
 libs = ["lib"]
 solc = '0.8.28'
-remappings = []
+remappings = [
+    "@openzeppelin/=lib/openzeppelin-contracts/",
+]
+no_match_coverage = "test/"
 
 [rpc_endpoints]
 mainnet = "${RPC_MAINNET}"
